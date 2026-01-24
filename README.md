@@ -1,4 +1,4 @@
-# VideoMaker Generator
+# FrameForge
 
 Stack local para generar vídeos de forma automática a partir de audio y texto.
 Diseñado para funcionar completamente en Docker (Windows hoy, Ubuntu mañana).
@@ -24,7 +24,7 @@ Diseñado para funcionar completamente en Docker (Windows hoy, Ubuntu mañana).
 ## 📁 Estructura del repositorio
 
 ```text
-videomaker/
+frameforge/
 ├── docker-compose.yml      # Orquestación de servicios
 ├── .env.example            # Variables de entorno de ejemplo
 ├── README.md               # Documentación principal
@@ -143,7 +143,7 @@ Recomendación: exportar tras cada cambio importante.
 1. Crear backup
 ```bash
 docker run --rm \
-  -v videomaker_n8n_data:/volume \
+  -v frameforge_n8n_data:/volume \
   -v "$PWD":/backup \
   alpine \
   tar czf /backup/n8n_data_backup.tar.gz -C /volume .
@@ -154,11 +154,11 @@ docker run --rm \
     ⚠️ Esto sobrescribe el estado actual de n8n.
 
 docker compose down
-docker volume rm videomaker_n8n_data
+docker volume rm frameforge_n8n_data
 
-docker volume create videomaker_n8n_data
+docker volume create frameforge_n8n_data
 docker run --rm \
-  -v videomaker_n8n_data:/volume \
+  -v frameforge_n8n_data:/volume \
   -v "$PWD":/backup \
   alpine \
   sh -lc "cd /volume && tar xzf /backup/n8n_data_backup.tar.gz"
