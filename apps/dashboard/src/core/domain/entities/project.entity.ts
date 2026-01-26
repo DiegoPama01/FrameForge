@@ -1,21 +1,30 @@
-export type ProjectStatus = 'Success' | 'Processing' | 'Error' | 'Idle';
+export type ProjectStatus = 'Idle' | 'Processing' | 'Success' | 'Error' | 'Cancelled';
+
+export type ProjectStage =
+    | 'Text Scrapped'
+    | 'Text Translated'
+    | 'Speech Generated'
+    | 'Subtitles Created'
+    | 'Thumbnail Created'
+    | 'Cancelled';
 
 export interface Project {
     id: string;
     title: string;
     source: string;
+    category?: string;
     status: ProjectStatus;
+    currentStage: ProjectStage;
     updatedAt: string;
     duration?: string;
-    currentStage?: string;
+    content?: string;
 }
 
 export interface Job {
     id: string;
+    projectId: string;
     type: string;
-    status: 'pending' | 'running' | 'completed' | 'failed';
+    status: string;
     progress: number;
     createdAt: string;
-    result?: any;
-    error?: string;
 }

@@ -1,10 +1,11 @@
 "use client";
 import React, { useState } from 'react';
 import { ApiClient } from '../../infrastructure/api/api.client';
+import { ProjectProvider, useProject } from '../context/ProjectContext';
 
 export const Header: React.FC = () => {
+    const { refresh, view, setView } = useProject();
     const [triggering, setTriggering] = useState(false);
-
     const [harvesting, setHarvesting] = useState(false);
 
     const handleTrigger = async () => {
@@ -25,6 +26,7 @@ export const Header: React.FC = () => {
         try {
             const res = await ApiClient.harvestProjects();
             alert(`Harvesting complete! Found ${res.harvested_count} new stories.`);
+            await refresh(); // Auto-refresh the project list
         } catch (error) {
             console.error('Failed to harvest', error);
             alert('Failed to harvest stories. Check Worker logs.');
@@ -45,9 +47,19 @@ export const Header: React.FC = () => {
             </div>
             <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-                    <button className="px-3 py-1 text-xs font-medium rounded-md bg-white dark:bg-slate-700 shadow-sm cursor-pointer">Dashboard</button>
+                    <button
+                        onClick={() => setView('projects')}
+                        className={`px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${view === 'projects' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    >
+                        Dashboard
+                    </button>
                     <button className="px-3 py-1 text-xs font-medium rounded-md text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors cursor-pointer">Analytics</button>
-                    <button className="px-3 py-1 text-xs font-medium rounded-md text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors cursor-pointer">Logs</button>
+                    <button
+                        onClick={() => setView('logs')}
+                        className={`px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${view === 'logs' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    >
+                        Logs
+                    </button>
                 </div>
                 <button className="size-9 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer">
                     <span className="material-symbols-outlined text-[20px]">notifications</span>
