@@ -11,7 +11,7 @@ export class HttpProjectRepository implements ProjectRepository {
             source: 'Reddit',
             category: p.category,
             status: (p.status || 'Idle') as ProjectStatus,
-            currentStage: (p.currentStage || 'Text Scrapped') as ProjectStage,
+            currentStage: (p.currentStage || 'Source Discovery') as ProjectStage,
             updatedAt: new Date().toISOString(),
         }));
     }
@@ -24,7 +24,7 @@ export class HttpProjectRepository implements ProjectRepository {
             source: 'Reddit',
             category: data.meta?.subreddit || 'Disk',
             status: (data.meta?.status || 'Idle') as ProjectStatus,
-            currentStage: (data.meta?.currentStage || 'Text Scrapped') as ProjectStage,
+            currentStage: (data.meta?.currentStage || 'Source Discovery') as ProjectStage,
             content: data.content,
             updatedAt: new Date().toISOString(),
         };
@@ -52,11 +52,11 @@ export class HttpProjectRepository implements ProjectRepository {
         await ApiClient.retryStage(id);
     }
 
-    async cleanupProject(id: string): Promise<void> {
+    async cleanup(id: string): Promise<void> {
         await ApiClient.cleanupProject(id);
     }
 
-    async deleteProject(id: string, complete: boolean): Promise<void> {
+    async delete(id: string, complete: boolean): Promise<void> {
         await ApiClient.deleteProject(id, complete);
     }
 }

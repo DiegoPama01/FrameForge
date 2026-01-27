@@ -8,9 +8,10 @@ from typing import Optional, List, Dict, Any
 import httpx
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Header, HTTPException, Depends, BackgroundTasks, Query, Request
+from fastapi import FastAPI, Header, HTTPException, Depends, BackgroundTasks, Query, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -40,6 +41,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- Static Files ---
+app.mount("/assets_static", StaticFiles(directory=ASSETS_ROOT), name="assets")
 
 # --- Models ---
 class Job(BaseModel):
@@ -84,6 +88,15 @@ def get_config_global(deps = Depends(auth)):
             defaults.update(json.loads(config_path.read_text()))
         except: pass
     return defaults
+
+@app.put("/config/global")
+def update_config_global(config: Dict[str, Any], deps = Depends(auth)):
+    config_path = DATA_ROOT / "config_global.json"
+    try:
+        config_path.write_text(json.dumps(config, indent=4))
+        return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save config: {e}")
 
 @app.get("/events")
 async def events_endpoint(deps = Depends(auth)):
@@ -304,6 +317,137 @@ def cleanup_project(project_id: str, deps = Depends(auth)):
         "deleted_count": len(deleted_files),
         "deleted_files": deleted_files
     }
+
+    return {
+        "status": "ok",
+        "deleted_count": len(deleted_files),
+        "deleted_files": deleted_files
+    }
+
+@app.get("/assets")
+def list_assets(deps = Depends(auth)):
+    if not ASSETS_ROOT.exists(): ASSETS_ROOT.mkdir(parents=True, exist_ok=True)
+    assets = []
+    
+    # Predefined categories
+    categories = ["backgrounds", "intros", "endings", "music", "sfx"]
+    for cat in categories:
+        (ASSETS_ROOT / cat).mkdir(exist_ok=True)
+
+    for root, dirnames, filenames in os.walk(ASSETS_ROOT):
+        for f in filenames:
+            f_path = Path(root) / f
+            rel_path = f_path.relative_to(ASSETS_ROOT)
+            
+            # Determine category from folder
+            category = rel_path.parts[0] if len(rel_path.parts) > 1 else "uncategorized"
+            
+            clean_path = str(rel_path).replace("\\", "/")
+            assets.append({
+                "name": f,
+                "path": clean_path,
+                "category": category,
+                "size": f_path.stat().st_size,
+                "created_at": datetime.fromtimestamp(f_path.stat().st_ctime).isoformat(),
+                "type": f_path.suffix.lower(),
+                "url": f"/assets_static/{clean_path}"
+            })
+            
+    return assets
+
+@app.post("/assets")
+async def upload_asset(
+    file: UploadFile = File(...), 
+    category: str = Form("uncategorized"),
+    deps = Depends(auth)
+):
+    if not ASSETS_ROOT.exists(): ASSETS_ROOT.mkdir(parents=True, exist_ok=True)
+    
+    # Sanitize category
+    category = "".join([c for c in category if c.isalnum() or c in "-_"]).lower()
+    if not category: category = "uncategorized"
+    
+    save_dir = ASSETS_ROOT / category
+    save_dir.mkdir(parents=True, exist_ok=True)
+    
+    file_path = save_dir / file.filename
+    
+    try:
+        with open(file_path, "wb") as f:
+            while content := await file.read(1024 * 1024):
+                f.write(content)
+                
+        return {
+            "status": "ok", 
+            "filename": file.filename, 
+            "category": category,
+            "path": f"{category}/{file.filename}",
+            "url": f"/assets_static/{category}/{file.filename}"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {e}")
+
+class MoveAssetRequest(BaseModel):
+    new_category: str
+
+@app.patch("/assets/{category}/{filename}")
+def move_asset(category: str, filename: str, body: MoveAssetRequest, deps = Depends(auth)):
+    old_path = (ASSETS_ROOT / category / filename).resolve()
+    
+    # Special case: if not found in category folder but category is "uncategorized", check root
+    if not old_path.exists() and category == "uncategorized":
+        alt_path = (ASSETS_ROOT / filename).resolve()
+        if alt_path.exists():
+            old_path = alt_path
+
+    # Sanitize new category
+    new_cat = "".join([c for c in body.new_category if c.isalnum() or c in "-_"]).lower()
+    if not new_cat: new_cat = "uncategorized"
+    
+    new_dir = ASSETS_ROOT / new_cat
+    if not new_dir.exists(): new_dir.mkdir(parents=True, exist_ok=True)
+    
+    new_path = new_dir / filename
+
+    # Security check
+    if not str(old_path).startswith(str(ASSETS_ROOT)):
+        raise HTTPException(status_code=403, detail="Access denied")
+        
+    if not old_path.exists():
+        raise HTTPException(status_code=404, detail="Asset not found")
+        
+    if new_path.exists():
+        raise HTTPException(status_code=409, detail="File already exists in target category")
+        
+    try:
+        import shutil
+        shutil.move(str(old_path), str(new_path))
+        return {
+            "status": "moved", 
+            "filename": filename, 
+            "from": category, 
+            "to": new_cat,
+            "url": f"/assets_static/{new_cat}/{filename}"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to move asset: {e}")
+
+@app.delete("/assets/{category}/{filename}")
+def delete_asset(category: str, filename: str, deps = Depends(auth)):
+    file_path = (ASSETS_ROOT / category / filename).resolve()
+    
+    # Security check
+    if not str(file_path).startswith(str(ASSETS_ROOT)):
+        raise HTTPException(status_code=403, detail="Access denied")
+        
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Asset not found")
+        
+    try:
+        file_path.unlink()
+        return {"status": "deleted", "filename": filename}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete: {e}")
 
 @app.get("/projects/{project_id}/files")
 def list_files(project_id: str, deps = Depends(auth)):

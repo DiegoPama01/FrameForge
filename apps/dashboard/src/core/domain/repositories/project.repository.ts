@@ -7,4 +7,6 @@ export interface ProjectRepository {
     sync(id: string): Promise<void>;
     runNextStage(id: string): Promise<void>;
     retryStage(id: string): Promise<void>;
+    cleanup(id: string): Promise<void>;
+    delete(id: string, complete: boolean): Promise<void>;
 }

@@ -22,7 +22,7 @@ COPY --from=whisper-build /opt/whisper.cpp/models /opt/whisper.cpp/models
 
 RUN python3 -m venv /opt/venv \
     && /opt/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel \
-    && /opt/venv/bin/pip install --no-cache-dir "fastapi==0.115.*" "uvicorn==0.34.*" "httpx" "feedparser" "beautifulsoup4" "sqlalchemy" "openai" \
+    && /opt/venv/bin/pip install --no-cache-dir "fastapi==0.115.*" "uvicorn==0.34.*" "httpx" "feedparser" "beautifulsoup4" "sqlalchemy" "openai" "python-multipart" "aiofiles" \
     && /opt/venv/bin/pip install --no-cache-dir --upgrade edge-tts
 
 ENV PATH="/opt/venv/bin:$PATH"

@@ -99,4 +99,45 @@ export class ApiClient {
         }
         return response.json();
     }
+
+    // --- Assets ---
+    static async getAssets(): Promise<any[]> {
+        return this.get('/assets');
+    }
+
+    static async uploadAsset(file: File, category: string = 'uncategorized'): Promise<any> {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('category', category);
+
+        const response = await fetch(`${this.baseUrl}/assets`, {
+            method: 'POST',
+            headers: {
+                'x-worker-token': this.token,
+            },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            throw new Error(`Upload Failed: ${response.statusText}`);
+        }
+        return response.json();
+    }
+
+    static async deleteAsset(category: string, filename: string): Promise<any> {
+        const response = await fetch(`${this.baseUrl}/assets/${category}/${filename}`, {
+            method: 'DELETE',
+            headers: {
+                'x-worker-token': this.token,
+            },
+        });
+        if (!response.ok) {
+            throw new Error(`Delete Failed: ${response.statusText}`);
+        }
+        return response.json();
+    }
+
+    static async updateAssetCategory(oldCategory: string, filename: string, newCategory: string): Promise<any> {
+        return this.patch(`/assets/${encodeURIComponent(oldCategory)}/${encodeURIComponent(filename)}`, { new_category: newCategory });
+    }
 }
