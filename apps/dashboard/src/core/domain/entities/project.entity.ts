@@ -6,6 +6,7 @@ export type ProjectStage =
     | 'Gender Analysis'
     | 'Vocal Synthesis'
     | 'Caption Engine'
+    | 'Thumbnail Forge'
     | 'Visual Production'
     | 'Cancelled';
 
@@ -42,7 +43,7 @@ export interface Workflow {
 export interface WorkflowParameter {
     id: string;
     label: string;
-    type: 'string' | 'number' | 'select' | 'boolean';
+    type: 'string' | 'number' | 'select' | 'boolean' | 'chips' | 'multiselect';
     placeholder?: string;
     defaultValue?: any;
     options?: { label: string; value: any }[];
@@ -56,5 +57,8 @@ export interface Job {
     progress: number;
     parameters: Record<string, any>;
     createdAt: string;
+    schedule_interval?: 'once' | 'daily' | 'weekly';
+    schedule_time?: string | null;
+    last_run?: string | null;
     error?: string;
 }

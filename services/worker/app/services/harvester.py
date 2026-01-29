@@ -10,6 +10,13 @@ import os
 
 PROJECTS_ROOT = Path(os.environ.get("DATA_ROOT", "/data")).resolve() / "projects"
 
+class HarvesterService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def harvest(self, config: dict) -> list:
+        return harvest_from_reddit(self.db, config)
+
 def ensure_project_dirs(project_id: str) -> Path:
     p = PROJECTS_ROOT / project_id
     (p / "audio/source").mkdir(parents=True, exist_ok=True)
@@ -23,11 +30,20 @@ def harvest_from_reddit(db: Session, config: dict) -> list:
     limit = config.get("REDDIT_LIMIT", 25)
     min_chars = config.get("MIN_CHARS", 600)
     max_chars = config.get("MAX_CHARS", 12000)
+    sort = (config.get("REDDIT_SORT") or "top").lower()
+    timeframe = (config.get("REDDIT_TIMEFRAME") or "day").lower()
+    if timeframe not in ["hour", "day", "week", "month", "year", "all"]:
+        timeframe = "day"
     
     harvested = []
     
     for sub in subreddits:
-        url = f"https://www.reddit.com/r/{sub}/top/.rss?t=week&limit={limit}"
+        if sort == "top":
+            url = f"https://www.reddit.com/r/{sub}/top/.rss?t={timeframe}&limit={limit}"
+        elif sort in ["new", "hot", "rising"]:
+            url = f"https://www.reddit.com/r/{sub}/{sort}/.rss?limit={limit}"
+        else:
+            url = f"https://www.reddit.com/r/{sub}/top/.rss?t={timeframe}&limit={limit}"
         try:
             feed = feedparser.parse(url)
             for entry in feed.entries:

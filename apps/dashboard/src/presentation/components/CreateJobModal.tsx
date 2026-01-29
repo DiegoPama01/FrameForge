@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from 'react';
-import { Workflow } from '../../core/domain/entities/project.entity';
+import { Workflow, WorkflowNode } from '../../core/domain/entities/project.entity';
 import { useProject } from '../context/ProjectContext';
 
 interface CreateJobModalProps {
@@ -10,20 +10,24 @@ interface CreateJobModalProps {
 }
 
 export const CreateJobModal: React.FC<CreateJobModalProps> = ({ workflow, isOpen, onClose }) => {
-    const { createJob } = useProject();
+    const { createJob, assetCategories } = useProject();
     const [params, setParams] = useState<Record<string, any>>({});
     const [currentStep, setCurrentStep] = useState(0);
+    const [scheduleInterval, setScheduleInterval] = useState<'once' | 'daily' | 'weekly'>('once');
+    const [scheduleTime, setScheduleTime] = useState('09:00');
 
     React.useEffect(() => {
         if (workflow?.nodes) {
             const defaults: Record<string, any> = {};
             workflow.nodes.forEach(node => {
                 node.parameters.forEach(p => {
-                    defaults[p.id] = p.defaultValue ?? '';
+                    defaults[p.id] = p.defaultValue ?? (p.type === 'chips' || p.type === 'multiselect' ? [] : '');
                 });
             });
             setParams(defaults);
             setCurrentStep(0);
+            setScheduleInterval('once');
+            setScheduleTime('09:00');
         }
     }, [workflow, isOpen]);
 
@@ -46,7 +50,14 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ workflow, isOpen
     };
 
     const handleLaunch = async () => {
-        await createJob(workflow.id, params);
+        if (scheduleInterval !== 'once' && !scheduleTime) {
+            alert('Please select a schedule time.');
+            return;
+        }
+        await createJob(workflow.id, params, {
+            interval: scheduleInterval,
+            time: scheduleInterval === 'once' ? undefined : scheduleTime
+        });
         onClose();
     };
 
@@ -69,7 +80,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ workflow, isOpen
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-background-dark rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200 min-h-[500px]">
+            <div className="bg-white dark:bg-background-dark rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200 max-h-[90vh]">
                 {/* Header with Stepper Progress */}
                 <div className="bg-slate-50/50 dark:bg-slate-900/30 p-6 border-b border-slate-100 dark:border-slate-800">
                     <div className="flex items-center justify-between mb-6">
@@ -118,40 +129,72 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ workflow, isOpen
                             </p>
 
                             <div className="space-y-5">
-                                {currentNode.parameters.map((param) => (
-                                    <div key={param.id} className="space-y-1.5">
-                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 ml-1">{param.label}</label>
-                                        {param.type === 'select' ? (
-                                            <select
-                                                value={params[param.id]}
-                                                onChange={(e) => handleParamChange(param.id, e.target.value)}
-                                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none cursor-pointer"
-                                            >
-                                                {param.options?.map(opt => (
-                                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                                ))}
-                                            </select>
-                                        ) : param.type === 'boolean' ? (
-                                            <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={params[param.id]}
-                                                    onChange={(e) => handleParamChange(param.id, e.target.checked)}
-                                                    className="size-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                {currentNode.parameters.map((param) => {
+                                    // Dynamic Filtering for Vocal Synthesis
+                                    let options = param.options || [];
+                                    if (currentNode.id === 'tpl-voice' && param.id === 'global_voice_style') {
+                                        const currentLang = params['global_language'] || 'es';
+                                        options = (param.options || []).filter(opt => {
+                                            return opt.value.startsWith(`${currentLang}-`);
+                                        });
+                                    }
+
+                                    // Dynamic Filtering for Asset Folders
+                                    if (param.id === 'asset_folder') {
+                                        options = assetCategories.map(f => ({
+                                            label: f.charAt(0).toUpperCase() + f.slice(1),
+                                            value: f
+                                        }));
+                                    }
+
+                                    return (
+                                        <div key={param.id} className={`space-y-1.5 ${param.id === 'global_voice_style' && params['global_gender'] === 'auto' ? 'hidden' : ''}`}>
+                                            <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 ml-1">{param.label}</label>
+
+                                            {param.type === 'chips' ? (
+                                                <ChipsInput
+                                                    value={params[param.id] || []}
+                                                    onChange={(val) => handleParamChange(param.id, val)}
+                                                    placeholder={param.placeholder}
                                                 />
-                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Enable feature</span>
-                                            </div>
-                                        ) : (
-                                            <input
-                                                type={param.type === 'number' ? 'number' : 'text'}
-                                                placeholder={param.placeholder}
-                                                value={params[param.id]}
-                                                onChange={(e) => handleParamChange(param.id, param.type === 'number' ? parseFloat(e.target.value) : e.target.value)}
-                                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none"
-                                            />
-                                        )}
-                                    </div>
-                                ))}
+                                            ) : param.type === 'multiselect' ? (
+                                                <MultiSelect
+                                                    value={params[param.id] || []}
+                                                    onChange={(val) => handleParamChange(param.id, val)}
+                                                    options={options}
+                                                />
+                                            ) : param.type === 'select' ? (
+                                                <select
+                                                    value={params[param.id]}
+                                                    onChange={(e) => handleParamChange(param.id, e.target.value)}
+                                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none cursor-pointer"
+                                                >
+                                                    {options.map(opt => (
+                                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                    ))}
+                                                </select>
+                                            ) : param.type === 'boolean' ? (
+                                                <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={params[param.id]}
+                                                        onChange={(e) => handleParamChange(param.id, e.target.checked)}
+                                                        className="size-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                                    />
+                                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Enable feature</span>
+                                                </div>
+                                            ) : (
+                                                <input
+                                                    type={param.type === 'number' ? 'number' : 'text'}
+                                                    placeholder={param.placeholder}
+                                                    value={params[param.id]}
+                                                    onChange={(e) => handleParamChange(param.id, param.type === 'number' ? parseFloat(e.target.value) : e.target.value)}
+                                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                                                />
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     ) : (
@@ -176,13 +219,62 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ workflow, isOpen
                                                 <div key={p.id} className="flex flex-col">
                                                     <span className="text-[9px] text-slate-400 font-bold">{p.label}</span>
                                                     <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">
-                                                        {typeof params[p.id] === 'boolean' ? (params[p.id] ? 'Yes' : 'No') : params[p.id]}
+                                                        {typeof params[p.id] === 'boolean'
+                                                            ? (params[p.id] ? 'Yes' : 'No')
+                                                            : Array.isArray(params[p.id])
+                                                                ? params[p.id].join(', ')
+                                                                : params[p.id]}
                                                     </span>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+
+                            <div className="bg-white dark:bg-slate-900/40 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[16px] text-primary">schedule</span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Scheduling</span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 ml-1">Run</label>
+                                        <select
+                                            value={scheduleInterval}
+                                            onChange={(e) => setScheduleInterval(e.target.value as 'once' | 'daily' | 'weekly')}
+                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none cursor-pointer"
+                                        >
+                                            <option value="once">Once (immediately)</option>
+                                            <option value="daily">Daily</option>
+                                            <option value="weekly">Weekly</option>
+                                        </select>
+                                    </div>
+                                    <div className={`space-y-1.5 ${scheduleInterval === 'once' ? 'opacity-50 pointer-events-none' : ''}`}>
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 ml-1">Time (UTC)</label>
+                                        <input
+                                            type="time"
+                                            value={scheduleTime}
+                                            onChange={(e) => setScheduleTime(e.target.value)}
+                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                                        />
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Times run in UTC</p>
+                            </div>
+
+                            <div className="p-5 rounded-3xl bg-primary/5 border border-primary/20 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <span className="material-symbols-outlined text-primary">schedule</span>
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-primary">Est. Total Duration</p>
+                                        <p className="text-sm font-black text-slate-800 dark:text-slate-100">~ 2m 45s</p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Resolution</p>
+                                    <p className="text-sm font-black text-slate-800 dark:text-slate-100">{getOutputFormatLabel(params['output_format'])}</p>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -219,6 +311,91 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ workflow, isOpen
                     )}
                 </div>
             </div>
+        </div>
+    );
+};
+
+function getOutputFormatLabel(value: string) {
+    switch (value) {
+        case '4k_vertical':
+            return '4K Vertical';
+        case 'mp4_horizontal':
+            return '1080p Horizontal';
+        case '4k_horizontal':
+            return '4K Horizontal';
+        case 'mp4':
+        default:
+            return '1080p Vertical';
+    }
+}
+
+const ChipsInput: React.FC<{ value: string[], onChange: (val: string[]) => void, placeholder?: string }> = ({ value, onChange, placeholder }) => {
+    const [input, setInput] = useState('');
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && input.trim()) {
+            e.preventDefault();
+            const newItem = input.trim().toLowerCase().replace(/^r\//, '');
+            if (!value.includes(newItem)) {
+                onChange([...value, newItem]);
+            }
+            setInput('');
+        }
+    };
+
+    const removeChip = (item: string) => {
+        onChange(value.filter(v => v !== item));
+    };
+
+    return (
+        <div className="space-y-2">
+            <div className="flex flex-wrap gap-2 p-3 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 min-h-[50px] items-start">
+                {value.map(item => (
+                    <div key={item} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary dark:bg-primary/20 rounded-lg text-xs font-bold ring-1 ring-primary/20">
+                        <span>{item}</span>
+                        <button type="button" onClick={() => removeChip(item)} className="material-symbols-outlined text-[14px] hover:text-rose-500 transition-colors cursor-pointer">close</button>
+                    </div>
+                ))}
+                <input
+                    type="text"
+                    placeholder={placeholder}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="bg-transparent border-none outline-none text-sm text-slate-700 dark:text-slate-300 py-1 px-2 flex-1 min-w-[120px]"
+                />
+            </div>
+        </div>
+    );
+};
+
+const MultiSelect: React.FC<{ value: string[], onChange: (val: string[]) => void, options: { label: string, value: any }[] }> = ({ value, onChange, options }) => {
+    const toggleOption = (optValue: string) => {
+        if (value.includes(optValue)) {
+            onChange(value.filter(v => v !== optValue));
+        } else {
+            onChange([...value, optValue]);
+        }
+    };
+
+    return (
+        <div className="grid grid-cols-1 gap-2">
+            {options.map(opt => {
+                const isSelected = value.includes(opt.value);
+                return (
+                    <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => toggleOption(opt.value)}
+                        className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${isSelected ? 'bg-primary/5 border-primary text-primary shadow-sm' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-100'}`}
+                    >
+                        <span className="text-sm font-bold">{opt.label}</span>
+                        <span className="material-symbols-outlined text-[20px]">
+                            {isSelected ? 'check_circle' : 'radio_button_unchecked'}
+                        </span>
+                    </button>
+                );
+            })}
         </div>
     );
 };

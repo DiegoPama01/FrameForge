@@ -1,6 +1,7 @@
 import os
 import json
 import base64
+import httpx
 from pathlib import Path
 from typing import Dict, Any
 from .base import BaseNode
@@ -115,22 +116,32 @@ Story Body: {story_text}"""
                 prompt=visual_prompt,
                 size="1536x1024",
                 quality="high",
-                response_format="b64_json",
                 extra_body={
                     "output_format": "png"
                 }
             )
             
-            if result.data and result.data[0].b64_json:
-                image_bytes = base64.b64decode(result.data[0].b64_json)
-                dst_img = project_path / "thumbnail.png"
-                with open(dst_img, "wb") as f:
-                    f.write(image_bytes)
-                await self.log(project_path.name, "Thumbnail saved successfully", "success")
-                return True
-            else:
-                await self.log(project_path.name, "Error: No image data returned", "error")
-                return False
+            if result.data:
+                data = result.data[0]
+                if getattr(data, "b64_json", None):
+                    image_bytes = base64.b64decode(data.b64_json)
+                elif getattr(data, "url", None):
+                    async with httpx.AsyncClient(timeout=30.0) as http:
+                        resp = await http.get(data.url)
+                        resp.raise_for_status()
+                        image_bytes = resp.content
+                else:
+                    image_bytes = None
+                
+                if image_bytes:
+                    dst_img = project_path / "thumbnail.png"
+                    with open(dst_img, "wb") as f:
+                        f.write(image_bytes)
+                    await self.log(project_path.name, "Thumbnail saved successfully", "success")
+                    return True
+
+            await self.log(project_path.name, "Error: No image data returned", "error")
+            return False
 
         except Exception as e:
             await self.log(project_path.name, f"Thumbnail Error: {e}", "error")

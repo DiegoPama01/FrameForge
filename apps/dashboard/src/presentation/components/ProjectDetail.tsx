@@ -11,7 +11,7 @@ interface ProjectDetailProps {
 }
 
 export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project }) => {
-    const { updateProject, runNextStage, retryStage, cleanupProject, deleteProject } = useProject();
+    const { updateProject, runNextStage, retryStage, cleanupProject, deleteProject, createShorts } = useProject();
     const [isEditing, setIsEditing] = React.useState(false);
     const [title, setTitle] = React.useState('');
     const [isFileBrowserOpen, setIsFileBrowserOpen] = React.useState(false);
@@ -25,6 +25,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project }) => {
             setTitle(project.title);
             setIsFileBrowserOpen(false);
             setIsContentViewOpen(false);
+            setIsDeleteModalOpen(false);
             // Fetch project content if available
             if (project.content) {
                 setProjectContent(project.content);
@@ -82,6 +83,16 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project }) => {
         }
     };
 
+    const handleCreateShorts = async () => {
+        if (!project) return;
+        try {
+            setIsRunning(true);
+            await createShorts(project.id, 3, 60);
+        } finally {
+            setIsRunning(false);
+        }
+    };
+
     const handleViewContent = () => {
         setIsContentViewOpen(true);
     };
@@ -91,11 +102,6 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project }) => {
         try {
             setIsRunning(true);
             await deleteProject(project.id, complete);
-            if (complete) {
-                alert('Project deleted permanently');
-            } else {
-                alert('Project cancelled successfully');
-            }
         } catch (error) {
             alert('Error during project removal');
         } finally {
@@ -206,7 +212,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project }) => {
                         {project.status !== 'Cancelled' && project.currentStage !== 'Cancelled' && (
                             <div className="border-t border-slate-100 dark:border-slate-800 mt-10 pt-8">
                                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-4">Pipeline Actions</label>
-                                <div className="grid grid-cols-5 gap-3">
+                                <div className="grid grid-cols-6 gap-3">
                                     <button
                                         onClick={handleRunStage}
                                         disabled={project.status === 'Processing' || isRunning}
@@ -249,6 +255,14 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project }) => {
                                     >
                                         <span className="material-symbols-outlined text-slate-500 group-hover:text-rose-500">delete_sweep</span>
                                         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 group-hover:text-rose-500">Cleanup</span>
+                                    </button>
+                                    <button
+                                        onClick={handleCreateShorts}
+                                        disabled={isRunning}
+                                        className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-primary/5 hover:border-primary/50 transition-all group cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <span className="material-symbols-outlined text-slate-500 group-hover:text-primary">movie</span>
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 group-hover:text-primary">Create Shorts</span>
                                     </button>
                                     <button
                                         onClick={() => setIsFileBrowserOpen(true)}

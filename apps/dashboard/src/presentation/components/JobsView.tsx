@@ -1,7 +1,8 @@
 "use client";
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useProject } from '../context/ProjectContext';
-import { Project } from '../../core/domain/entities/project.entity';
+import { Job, Workflow } from '../../core/domain/entities/project.entity';
+import { EditJobModal } from './EditJobModal';
 
 type WorkflowTemplate = {
     id: string;
@@ -55,8 +56,10 @@ const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
 const DEFAULT_STAGES = WORKFLOW_TEMPLATES[0].stages;
 
 export const JobsView: React.FC = () => {
-    const { jobs, workflows, globalSearch } = useProject();
+    const { jobs, workflows, globalSearch, deleteJob, runJob } = useProject();
     const [statusFilter, setStatusFilter] = useState('All');
+    const [editingJob, setEditingJob] = useState<Job | null>(null);
+    const [isEditOpen, setIsEditOpen] = useState(false);
 
     const normalizedSearch = globalSearch.trim().toLowerCase();
 
@@ -76,13 +79,29 @@ export const JobsView: React.FC = () => {
         });
     }, [jobs, statusFilter, normalizedSearch, workflows]);
 
-    const jobStats = useMemo(() => {
-        const total = jobs.length;
-        const running = jobs.filter((job) => job.status === 'Running').length;
-        const errors = jobs.filter((job) => job.status === 'Failed').length;
-        const pending = jobs.filter((job) => job.status === 'Pending').length;
-        return { total, running, errors, pending };
-    }, [jobs]);
+    const handleDelete = async (jobId: string) => {
+        if (!confirm('Delete this job?')) return;
+        await deleteJob(jobId);
+    };
+
+    const handleRun = async (jobId: string) => {
+        await runJob(jobId);
+    };
+
+    const openEdit = (job: Job) => {
+        setEditingJob(job);
+        setIsEditOpen(true);
+    };
+
+    const closeEdit = () => {
+        setIsEditOpen(false);
+        setEditingJob(null);
+    };
+
+    const editingWorkflow: Workflow | null = useMemo(() => {
+        if (!editingJob) return null;
+        return workflows.find(w => w.id === editingJob.workflowId) || null;
+    }, [editingJob, workflows]);
 
     return (
         <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-900/20 p-6">
@@ -96,50 +115,6 @@ export const JobsView: React.FC = () => {
             </section>
 
             <section className="flex-1 overflow-y-auto custom-scrollbar space-y-8">
-                {/* Stats Summary */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark p-6 shadow-xl shadow-slate-200/20 transition-all hover:-translate-y-1">
-                        <div className="flex items-center justify-between mb-4">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Lifecycle</p>
-                            <div className="size-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
-                                <span className="material-symbols-outlined text-lg">history</span>
-                            </div>
-                        </div>
-                        <p className="text-4xl font-black text-slate-900 dark:text-slate-100">{jobStats.total}</p>
-                        <p className="text-[11px] text-slate-400 font-bold uppercase mt-2">Historical Records</p>
-                    </div>
-                    <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark p-6 shadow-xl shadow-slate-200/20 transition-all hover:-translate-y-1">
-                        <div className="flex items-center justify-between mb-4">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">Running</p>
-                            <div className="size-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
-                                <span className="material-symbols-outlined text-lg animate-spin">autorenew</span>
-                            </div>
-                        </div>
-                        <p className="text-4xl font-black text-blue-600 dark:text-blue-500">{jobStats.running}</p>
-                        <p className="text-[11px] text-blue-400 font-bold uppercase mt-2">Active Processing</p>
-                    </div>
-                    <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark p-6 shadow-xl shadow-slate-200/20 transition-all hover:-translate-y-1">
-                        <div className="flex items-center justify-between mb-4">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-amber-500">Pending</p>
-                            <div className="size-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
-                                <span className="material-symbols-outlined text-lg">hourglass_empty</span>
-                            </div>
-                        </div>
-                        <p className="text-4xl font-black text-amber-500">{jobStats.pending}</p>
-                        <p className="text-[11px] text-amber-500 font-bold uppercase mt-2">In Queue</p>
-                    </div>
-                    <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark p-6 shadow-xl shadow-slate-200/20 transition-all hover:-translate-y-1">
-                        <div className="flex items-center justify-between mb-4">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-rose-500">Failed</p>
-                            <div className="size-8 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-500">
-                                <span className="material-symbols-outlined text-lg">error</span>
-                            </div>
-                        </div>
-                        <p className="text-4xl font-black text-rose-500">{jobStats.errors}</p>
-                        <p className="text-[11px] text-rose-500 font-bold uppercase mt-2">Needs Review</p>
-                    </div>
-                </div>
-
                 {/* Jobs Queue */}
                 <div className="bg-white dark:bg-background-dark rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                     <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-50/30 dark:bg-transparent">
@@ -205,8 +180,15 @@ export const JobsView: React.FC = () => {
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Target Subreddit</span>
-                                                <span className="text-sm font-bold text-slate-800 dark:text-slate-200 tracking-tight">r/{job.parameters.subreddit || 'N/A'}</span>
+                                                <span className="text-sm font-bold text-slate-800 dark:text-slate-200 tracking-tight">
+                                                    {getSubredditLabel(job.parameters)}
+                                                </span>
                                             </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                            <span className="material-symbols-outlined text-[14px]">event</span>
+                                            <span>{getScheduleLabel(job)}</span>
                                         </div>
 
                                         <div className="space-y-3">
@@ -228,9 +210,52 @@ export const JobsView: React.FC = () => {
                                             <span className="material-symbols-outlined text-sm">schedule</span>
                                             <span className="text-[10px] font-bold uppercase tracking-tighter">{new Date(job.createdAt).toLocaleTimeString()}</span>
                                         </div>
-                                        <button className="size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer">
-                                            <span className="material-symbols-outlined text-lg">arrow_forward</span>
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={(event) => {
+                                                    event.preventDefault();
+                                                    event.stopPropagation();
+                                                    openEdit(job);
+                                                }}
+                                                className="size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer"
+                                                title="Edit job"
+                                                aria-label="Edit job"
+                                            >
+                                                <span className="material-symbols-outlined text-lg">tune</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={(event) => {
+                                                    event.preventDefault();
+                                                    event.stopPropagation();
+                                                    void handleRun(job.id);
+                                                }}
+                                                className={`size-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                                                    job.status === 'Running'
+                                                        ? 'text-slate-300 cursor-not-allowed'
+                                                        : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-500/10'
+                                                }`}
+                                                title="Run job now"
+                                                aria-label="Run job now"
+                                                disabled={job.status === 'Running'}
+                                            >
+                                                <span className="material-symbols-outlined text-lg">play_arrow</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={(event) => {
+                                                    event.preventDefault();
+                                                    event.stopPropagation();
+                                                    void handleDelete(job.id);
+                                                }}
+                                                className="size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-all cursor-pointer"
+                                                title="Delete job"
+                                                aria-label="Delete job"
+                                            >
+                                                <span className="material-symbols-outlined text-lg">delete</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             );
@@ -238,6 +263,12 @@ export const JobsView: React.FC = () => {
                     </div>
                 </div>
             </section>
+            <EditJobModal
+                job={editingJob}
+                workflow={editingWorkflow}
+                isOpen={isEditOpen}
+                onClose={closeEdit}
+            />
         </div>
     );
 };
@@ -254,6 +285,30 @@ function getStatusClasses(status: string) {
         default:
             return 'bg-slate-100 text-slate-600 dark:bg-slate-700/50 dark:text-slate-400 border-slate-200 dark:border-slate-700';
     }
+}
+
+function getSubredditLabel(parameters: Record<string, any>) {
+    const raw = Array.isArray(parameters?.subreddits)
+        ? parameters.subreddits
+        : parameters?.subreddit
+            ? [parameters.subreddit]
+            : [];
+
+    const cleaned = raw
+        .map((value: any) => String(value).replace(/^r\//i, '').trim())
+        .filter(Boolean);
+
+    if (cleaned.length === 0) return 'N/A';
+    return `r/${cleaned.join(', r/')}`;
+}
+
+function getScheduleLabel(job: Job) {
+    const interval = job.schedule_interval || 'once';
+    const time = job.schedule_time ? `${job.schedule_time} UTC` : '';
+    if (interval === 'daily') return `Daily ${time}`.trim();
+    if (interval === 'weekly') return `Weekly ${time}`.trim();
+    if (interval === 'once' && time) return `Once at ${time}`;
+    return 'Manual';
 }
 
 function getWorkflowStatusClasses(status: WorkflowTemplate['status']) {

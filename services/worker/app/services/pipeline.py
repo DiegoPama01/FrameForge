@@ -19,6 +19,7 @@ from ..nodes.translation import TranslationNode
 from ..nodes.tts import TTSNode
 from ..nodes.subtitles import SubtitlesNode
 from ..nodes.thumbnail import ThumbnailNode
+from ..nodes.mastering import MasteringNode
 
 
 
@@ -30,7 +31,8 @@ STAGE_SEQUENCE = [
     'Text Translated', 
     'Speech Generated', 
     'Subtitles Created', 
-    'Thumbnail Created'
+    'Thumbnail Created',
+    'Master Composition'
 ]
 
 async def execute_stage(project_id: str, stage: str):
@@ -70,7 +72,8 @@ async def execute_stage(project_id: str, stage: str):
             "Text Translated": TranslationNode,
             "Speech Generated": TTSNode,
             "Subtitles Created": SubtitlesNode,
-            "Thumbnail Created": ThumbnailNode
+            "Thumbnail Created": ThumbnailNode,
+            "Master Composition": MasteringNode
         }
         
         node_class = node_map.get(stage)
@@ -85,7 +88,17 @@ async def execute_stage(project_id: str, stage: str):
             project.status = "Success"
             print(f"--- Stage '{stage}' success")
             await broadcaster.broadcast("log", {"level": "success", "message": f"Stage '{stage}' completed successfully", "project_id": project_id})
-            await broadcaster.broadcast("status_update", {"id": project_id, "status": "Success", "currentStage": stage})
+            duration_value = None
+            if meta_path.exists():
+                try:
+                    meta = json.loads(meta_path.read_text())
+                    duration_value = meta.get("duration")
+                except:
+                    pass
+            payload = {"id": project_id, "status": "Success", "currentStage": stage}
+            if duration_value:
+                payload["duration"] = duration_value
+            await broadcaster.broadcast("status_update", payload)
         else:
             project.status = "Error"
             # Revert to previous stage on failure to allow retry

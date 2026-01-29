@@ -1,17 +1,40 @@
-import { Project, ProjectStatus, ProjectStage } from '../../core/domain/entities/project.entity';
+import { Project, ProjectStatus, ProjectStage, Workflow, Job } from '../../core/domain/entities/project.entity';
 import { ProjectRepository } from '../../core/domain/repositories/project.repository';
 import { ApiClient } from '../api/api.client';
 
+const STAGE_LABELS: Record<string, ProjectStage> = {
+    'Text Scrapped': 'Source Discovery',
+    'Text Translated': 'Content Translation',
+    'Speech Generated': 'Vocal Synthesis',
+    'Subtitles Created': 'Caption Engine',
+    'Thumbnail Created': 'Thumbnail Forge',
+    'Master Composition': 'Visual Production',
+    'Source Discovery': 'Source Discovery',
+    'Content Translation': 'Content Translation',
+    'Gender Analysis': 'Gender Analysis',
+    'Vocal Synthesis': 'Vocal Synthesis',
+    'Caption Engine': 'Caption Engine',
+    'Thumbnail Forge': 'Thumbnail Forge',
+    'Visual Production': 'Visual Production',
+    'Cancelled': 'Cancelled',
+};
+
+const normalizeStage = (stage?: string): ProjectStage => {
+    if (!stage) return 'Source Discovery';
+    return STAGE_LABELS[stage] || 'Source Discovery';
+};
+
 export class HttpProjectRepository implements ProjectRepository {
     async getAll(): Promise<Project[]> {
-        const projects = await ApiClient.get<{ id: string, name: string, category: string, status: string, currentStage: string }[]>('/projects');
+        const projects = await ApiClient.get<{ id: string, name: string, category: string, status: string, currentStage: string, duration?: string }[]>('/projects');
         return projects.map(p => ({
             id: p.id,
             title: p.name,
             source: 'Reddit',
             category: p.category,
             status: (p.status || 'Idle') as ProjectStatus,
-            currentStage: (p.currentStage || 'Source Discovery') as ProjectStage,
+            currentStage: normalizeStage(p.currentStage),
+            duration: p.duration || undefined,
             updatedAt: new Date().toISOString(),
         }));
     }
@@ -24,7 +47,8 @@ export class HttpProjectRepository implements ProjectRepository {
             source: 'Reddit',
             category: data.meta?.subreddit || 'Disk',
             status: (data.meta?.status || 'Idle') as ProjectStatus,
-            currentStage: (data.meta?.currentStage || 'Source Discovery') as ProjectStage,
+            currentStage: normalizeStage(data.meta?.currentStage),
+            duration: data.meta?.duration,
             content: data.content,
             updatedAt: new Date().toISOString(),
         };
@@ -58,5 +82,74 @@ export class HttpProjectRepository implements ProjectRepository {
 
     async delete(id: string, complete: boolean): Promise<void> {
         await ApiClient.deleteProject(id, complete);
+    }
+
+    async createShorts(id: string, count?: number, segmentLength?: number): Promise<void> {
+        await ApiClient.createShorts(id, {
+            count,
+            segment_length: segmentLength
+        });
+    }
+
+    // Workflows
+    async getWorkflows(): Promise<Workflow[]> {
+        return ApiClient.get<Workflow[]>('/workflows');
+    }
+
+    async createWorkflow(workflow: Workflow): Promise<void> {
+        await ApiClient.post('/workflows', workflow);
+    }
+
+    async deleteWorkflow(id: string): Promise<void> {
+        const response = await fetch(`${ApiClient['baseUrl']}/workflows/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'x-worker-token': ApiClient['token'],
+            },
+        });
+        if (!response.ok) {
+            throw new Error(`Delete Workflow Failed: ${response.statusText}`);
+        }
+    }
+
+    // Jobs
+    async getJobs(): Promise<Job[]> {
+        return ApiClient.get<Job[]>('/jobs');
+    }
+
+    async createJob(
+        workflowId: string,
+        parameters: Record<string, any>,
+        scheduling?: { interval: string; time?: string }
+    ): Promise<{ id: string }> {
+        const payload: Record<string, any> = { workflowId, parameters };
+        if (scheduling?.interval) {
+            payload.schedule_interval = scheduling.interval;
+            if (scheduling.time) payload.schedule_time = scheduling.time;
+        }
+        return ApiClient.post<{ id: string }>('/jobs', payload);
+    }
+
+    async deleteJob(id: string): Promise<void> {
+        await ApiClient.deleteJob(id);
+    }
+
+    async runJob(id: string): Promise<void> {
+        await ApiClient.runJob(id);
+    }
+
+    async updateJob(
+        id: string,
+        parameters: Record<string, any>,
+        scheduling?: { interval: string; time?: string }
+    ): Promise<void> {
+        const payload: Record<string, any> = { parameters };
+        if (scheduling?.interval) {
+            payload.schedule_interval = scheduling.interval;
+            if (scheduling.time !== undefined) {
+                payload.schedule_time = scheduling.time;
+            }
+        }
+        await ApiClient.updateJob(id, payload);
     }
 }

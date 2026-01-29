@@ -100,6 +100,38 @@ export class ApiClient {
         return response.json();
     }
 
+    static async deleteJob(jobId: string): Promise<any> {
+        const response = await fetch(`${this.baseUrl}/jobs/${jobId}`, {
+            method: 'DELETE',
+            headers: {
+                'x-worker-token': this.token,
+            },
+        });
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.statusText}`);
+        }
+        return response.json();
+    }
+
+    static async runJob(jobId: string): Promise<any> {
+        return this.post(`/jobs/${jobId}/run`);
+    }
+
+    static getEventsUrl(): string {
+        if (this.token) {
+            return `${this.baseUrl}/events?token=${encodeURIComponent(this.token)}`;
+        }
+        return `${this.baseUrl}/events`;
+    }
+
+    static async updateJob(jobId: string, body: any): Promise<any> {
+        return this.patch(`/jobs/${jobId}`, body);
+    }
+
+    static async createShorts(projectId: string, body?: { count?: number; segment_length?: number }): Promise<any> {
+        return this.post(`/projects/${projectId}/shorts`, body);
+    }
+
     // --- Assets ---
     static async getAssets(): Promise<any[]> {
         return this.get('/assets');
@@ -137,7 +169,7 @@ export class ApiClient {
         return response.json();
     }
 
-    static async updateAssetCategory(oldCategory: string, filename: string, newCategory: string): Promise<any> {
-        return this.patch(`/assets/${encodeURIComponent(oldCategory)}/${encodeURIComponent(filename)}`, { new_category: newCategory });
+    static async updateAssetCategories(category: string, filename: string, categories: string[]): Promise<any> {
+        return this.patch(`/assets/${encodeURIComponent(category)}/${encodeURIComponent(filename)}`, { categories });
     }
 }

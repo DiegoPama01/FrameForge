@@ -6,14 +6,21 @@ interface UploadAssetModalProps {
     isOpen: boolean;
     onClose: () => void;
     onUploadSuccess: () => void;
+    initialCategory?: string;
 }
 
-export const UploadAssetModal: React.FC<UploadAssetModalProps> = ({ isOpen, onClose, onUploadSuccess }) => {
+export const UploadAssetModal: React.FC<UploadAssetModalProps> = ({ isOpen, onClose, onUploadSuccess, initialCategory = 'uncategorized' }) => {
     const [files, setFiles] = useState<File[]>([]);
-    const [category, setCategory] = useState('uncategorized');
+    const [category, setCategory] = useState(initialCategory);
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<{ current: number, total: number }>({ current: 0, total: 0 });
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    React.useEffect(() => {
+        if (isOpen) {
+            setCategory(initialCategory);
+        }
+    }, [isOpen, initialCategory]);
 
     if (!isOpen) return null;
 
