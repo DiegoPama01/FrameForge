@@ -147,6 +147,13 @@ export class ApiClient {
         return this.post(`/projects/${projectId}/shorts`, body);
     }
 
+    static async getLogs(limit: number = 500, projectId?: string): Promise<any[]> {
+        const params = new URLSearchParams();
+        params.set('limit', `${limit}`);
+        if (projectId) params.set('project_id', projectId);
+        return this.get(`/logs?${params.toString()}`);
+    }
+
     // --- Assets ---
     static async getAssets(): Promise<any[]> {
         return this.get('/assets');

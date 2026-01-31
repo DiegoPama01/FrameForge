@@ -594,6 +594,26 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, []);
 
     useEffect(() => {
+        const loadPersistedLogs = async () => {
+            try {
+                const stored = await ApiClient.getLogs(500);
+                if (Array.isArray(stored)) {
+                    setLogs(stored.map((entry: LogEntry) => ({
+                        timestamp: entry.timestamp || new Date().toISOString(),
+                        level: entry.level || 'info',
+                        message: entry.message || '',
+                        project_id: entry.project_id
+                    })));
+                }
+            } catch (error) {
+                console.error('Failed to load logs', error);
+            }
+        };
+
+        loadPersistedLogs();
+    }, []);
+
+    useEffect(() => {
         const eventsUrl = ApiClient.getEventsUrl();
         const source = new EventSource(eventsUrl);
 
