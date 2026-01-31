@@ -1,9 +1,9 @@
 import asyncio
 import random
-import json
 from pathlib import Path
 from typing import Dict, Any, List
 from .base import BaseNode
+from ..services.meta_store import load_meta, update_meta
 
 # Using edge-tts for Speech (Free)
 try:
@@ -32,13 +32,10 @@ class TTSNode(BaseNode):
         male_voices = ["es-ES-AlvaroNeural", "es-MX-JorgeNeural", "es-AR-TomasNeural"]
         female_voices = ["es-ES-ElviraNeural", "es-MX-DaliaNeural", "es-AR-ElenaNeural"]
         
-        meta_path = project_path / "meta.json"
         gender = "male"
-        if meta_path.exists():
-            try:
-                meta = json.loads(meta_path.read_text())
-                gender = meta.get("narrator_gender", "male")
-            except: pass
+        meta = load_meta(project_path.name, project_path)
+        if meta:
+            gender = meta.get("narrator_gender", "male")
         
         voice_pool = female_voices if gender == "female" else male_voices
         
@@ -118,11 +115,5 @@ class TTSNode(BaseNode):
                 seconds = int(duration_seconds % 60)
                 duration_str = f"{minutes:02d}:{seconds:02d}"
                 
-                meta_path = project_path / "meta.json"
-                if meta_path.exists():
-                    try:
-                        meta = json.loads(meta_path.read_text())
-                        meta["duration"] = duration_str
-                        meta_path.write_text(json.dumps(meta, indent=4))
-                    except: pass
+                update_meta(project_path.name, {"duration": duration_str}, project_path)
         except: pass

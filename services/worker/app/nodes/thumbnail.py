@@ -1,10 +1,10 @@
 import os
-import json
 import base64
 import httpx
 from pathlib import Path
 from typing import Dict, Any
 from .base import BaseNode
+from ..services.meta_store import load_meta, update_meta
 
 try:
     from openai import OpenAI, AsyncOpenAI
@@ -14,12 +14,11 @@ except ImportError:
 
 class ThumbnailNode(BaseNode):
     async def execute(self, project_path: Path, context: Dict[str, Any]) -> bool:
-        meta_path = project_path / "meta.json"
         txt_path = project_path / "text" / "story_translated.txt"
         if not txt_path.exists():
             txt_path = project_path / "text" / "story.txt"
         
-        if not txt_path.exists() or not meta_path.exists():
+        if not txt_path.exists():
             await self.log(project_path.name, "Thumbnail failed: No text/meta found", "error")
             return False
             
@@ -33,7 +32,10 @@ class ThumbnailNode(BaseNode):
                 return False
 
             client = AsyncOpenAI(api_key=api_key)
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            meta = load_meta(project_path.name, project_path)
+            if not meta:
+                await self.log(project_path.name, "Thumbnail failed: Missing metadata", "error")
+                return False
             story_text = txt_path.read_text(encoding="utf-8")
             story_title = meta.get("title_es", meta.get("title", ""))
 
@@ -137,6 +139,7 @@ Story Body: {story_text}"""
                     dst_img = project_path / "thumbnail.png"
                     with open(dst_img, "wb") as f:
                         f.write(image_bytes)
+                    update_meta(project_path.name, {"thumbnail": "thumbnail.png"}, project_path)
                     await self.log(project_path.name, "Thumbnail saved successfully", "success")
                     return True
 

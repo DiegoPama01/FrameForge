@@ -67,9 +67,21 @@ def harvest_from_reddit(db: Session, config: dict) -> list:
 
                 p_dir = ensure_project_dirs(project_id)
                 
+                author = None
+                if hasattr(entry, "author"):
+                    author = entry.author
+                elif isinstance(entry, dict):
+                    author = entry.get("author")
+                if not author and isinstance(entry, dict):
+                    author_detail = entry.get("author_detail") or {}
+                    author = author_detail.get("name")
+                if not author and isinstance(entry, dict):
+                    author = entry.get("dc_creator")
+
                 meta = {
                     "id": project_id,
                     "title": entry.title,
+                    "author": author,
                     "subreddit": sub,
                     "link": entry.link,
                     "published": entry.published if hasattr(entry, 'published') else datetime.now().isoformat(),
@@ -85,10 +97,12 @@ def harvest_from_reddit(db: Session, config: dict) -> list:
                 new_project = ProjectModel(
                     id=project_id,
                     title=entry.title,
+                    author=author,
                     subreddit=sub,
                     status="Success",
                     current_stage="Text Scrapped",
-                    updated_at=datetime.utcnow()
+                    updated_at=datetime.utcnow(),
+                    meta_json=json.dumps(meta)
                 )
                 db.add(new_project)
                 harvested.append(project_id)

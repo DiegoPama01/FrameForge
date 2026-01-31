@@ -10,16 +10,18 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Header, HTTPException, Depends, BackgroundTasks, Query, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 # Local imports
 # Local imports
-from .database import engine, Base, ProjectModel, AssetModel, WorkflowModel, JobModel, SessionLocal, get_db, sync_projects_to_db
+from .database import engine, Base, ProjectModel, AssetModel, AssetCategoryModel, TemplateModel, WorkflowModel, JobModel, SessionLocal, get_db, sync_projects_to_db
 from .services.harvester import harvest_from_reddit, HarvesterService
-from .services.pipeline import execute_stage, STAGE_SEQUENCE
+from .services.pipeline import execute_stage, execute_remaining_stages, STAGE_SEQUENCE
+from .services.meta_store import update_meta
+from .services.template_service import generate_preview_for_project, render_preview_bytes
 from .broadcaster import broadcaster
 
 # --- Configuration ---
@@ -28,15 +30,13 @@ PROJECTS_ROOT = DATA_ROOT / "projects"
 ASSETS_ROOT = DATA_ROOT / "assets"
 TOKEN = os.environ.get("WORKER_TOKEN", "")
 
-def _read_project_duration(project_id: str) -> Optional[str]:
-    meta_path = PROJECTS_ROOT / project_id / "meta.json"
-    if not meta_path.exists():
-        return None
+def _parse_meta_json(meta_json: Optional[str]) -> Dict[str, Any]:
+    if not meta_json:
+        return {}
     try:
-        meta = json.loads(meta_path.read_text(encoding="utf-8"))
-        return meta.get("duration")
+        return json.loads(meta_json)
     except:
-        return None
+        return {}
 
 def _parse_srt_starts(srt_path: Path) -> List[float]:
     if not srt_path.exists():
@@ -66,6 +66,7 @@ def _parse_srt_time(value: str) -> Optional[float]:
         return int(hh) * 3600 + int(mm) * 60 + int(ss) + int(ms) / 1000.0
     except:
         return None
+
 
 async def _get_media_duration(path: Path) -> Optional[float]:
     try:
@@ -168,15 +169,8 @@ async def _generate_shorts_task(project_id: str, count: int, segment_length: flo
         except Exception as e:
             await broadcaster.broadcast("log", {"level": "error", "message": f"Shorts export exception: {e}", "project_id": project_id})
 
-    # Update meta
-    meta_path = project_path / "meta.json"
-    if meta_path.exists() and exported:
-        try:
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            meta["shorts"] = exported
-            meta_path.write_text(json.dumps(meta, indent=4))
-        except:
-            pass
+    if exported:
+        update_meta(project_id, {"shorts": exported}, project_path)
 
 def sync_workflows_to_db():
     print(">>> SYNC: Starting default workflow synchronization...")
@@ -658,7 +652,8 @@ def list_projects(db: Session = Depends(get_db), deps = Depends(auth)):
         "category": p.subreddit,
         "status": p.status,
         "currentStage": p.current_stage,
-        "duration": _read_project_duration(p.id)
+        "duration": _parse_meta_json(p.meta_json).get("duration"),
+        "thumbnail": _parse_meta_json(p.meta_json).get("thumbnail")
     } for p in results]
 
 @app.get("/projects/{project_id}")
@@ -667,23 +662,25 @@ def get_project(project_id: str, db: Session = Depends(get_db), deps = Depends(a
     if not project: raise HTTPException(status_code=404, detail="Project not found")
     
     p_path = PROJECTS_ROOT / project_id
+
     data = {
         "project_id": project_id,
         "meta": {
             "title": project.title,
+            "author": project.author,
             "status": project.status,
             "currentStage": project.current_stage,
             "subreddit": project.subreddit,
             "updatedAt": project.updated_at.isoformat()
         }
     }
-    meta_path = p_path / "meta.json"
-    if meta_path.exists():
-        try:
-            meta_json = json.loads(meta_path.read_text(encoding="utf-8"))
-            data["meta"].update({k: v for k, v in meta_json.items() if k not in data["meta"]})
-        except:
-            pass
+    meta_json = _parse_meta_json(project.meta_json)
+    if meta_json:
+        if (not project.title or project.title.lower() == "project" or project.title == project_id) and meta_json.get("title"):
+            data["meta"]["title"] = meta_json.get("title")
+        if (not project.author) and meta_json.get("author"):
+            data["meta"]["author"] = meta_json.get("author")
+    data["meta"].update({k: v for k, v in meta_json.items() if k not in data["meta"]})
     
     # Read content
     story_path = p_path / "text/story_translated.txt"
@@ -699,18 +696,31 @@ def update_project_meta(project_id: str, new_meta: Dict[str, Any], db: Session =
     if not project: raise HTTPException(status_code=404, detail="Project not found")
     
     if "title" in new_meta: project.title = new_meta["title"]
+    if "author" in new_meta: project.author = new_meta["author"]
     if "status" in new_meta: project.status = new_meta["status"]
     if "currentStage" in new_meta: project.current_stage = new_meta["currentStage"]
+    existing_meta = _parse_meta_json(project.meta_json)
+    existing_meta.update(new_meta)
+    project.meta_json = json.dumps(existing_meta)
     db.commit()
-    
-    # Sync filesystem
-    meta_path = PROJECTS_ROOT / project_id / "meta.json"
-    if meta_path.exists():
-        try:
-            m = json.loads(meta_path.read_text()); m.update(new_meta)
-            meta_path.write_text(json.dumps(m, indent=4))
-        except: pass
     return {"status": "ok"}
+
+@app.post("/projects/{project_id}/preview")
+def generate_project_preview(
+    project_id: str,
+    type: str = Query(..., pattern="^(intro|outro)$"),
+    db: Session = Depends(get_db),
+    deps = Depends(auth)
+):
+    project = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    generate_preview_for_project(project, db, project_id, type)
+    output_path = PROJECTS_ROOT / project_id / "video" / "parts" / f"{type}_preview.png"
+    if not output_path.exists():
+        raise HTTPException(status_code=500, detail="Preview not generated")
+    return {"status": "ok", "path": str(output_path.relative_to(PROJECTS_ROOT / project_id))}
 
 @app.delete("/projects/{project_id}")
 def delete_project(project_id: str, complete: bool = False, db: Session = Depends(get_db), deps = Depends(auth)):
@@ -738,15 +748,7 @@ def delete_project(project_id: str, complete: bool = False, db: Session = Depend
         project.current_stage = "Cancelled"
         db.commit()
         
-        # Update filesystem metadata
-        meta_path = PROJECTS_ROOT / project_id / "meta.json"
-        if meta_path.exists():
-            try:
-                m = json.loads(meta_path.read_text())
-                m["status"] = "Cancelled"
-                m["currentStage"] = "Cancelled"
-                meta_path.write_text(json.dumps(m, indent=4))
-            except: pass
+        update_meta(project_id, {"status": "Cancelled", "currentStage": "Cancelled"}, PROJECTS_ROOT / project_id)
         
         return {"status": "cancelled", "complete": False}
 
@@ -768,6 +770,51 @@ async def run_stage(project_id: str, background_tasks: BackgroundTasks, db: Sess
     
     background_tasks.add_task(execute_stage, project_id, next_stage)
     return {"status": "started", "stage": next_stage}
+
+@app.post("/projects/{project_id}/export")
+async def export_final(project_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db), deps = Depends(auth)):
+    project = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Clear previous export artifacts but keep previews/overlays
+    p = PROJECTS_ROOT / project_id
+    parts_dir = p / "video" / "parts"
+    if parts_dir.exists():
+        for file in parts_dir.iterdir():
+            if not file.is_file():
+                continue
+            name = file.name.lower()
+            if name.endswith("_preview.png") or name.endswith("_overlay.png"):
+                continue
+            if name.startswith("main_background") or name.startswith("final_video"):
+                file.unlink(missing_ok=True)
+                continue
+            if name.startswith("bg_seg_") or name in ("bg_concat.txt", "final_concat.txt", "subtitles_shifted.srt"):
+                file.unlink(missing_ok=True)
+                continue
+            if name in ("intro_segment.mp4", "outro_segment.mp4", "intro_voice.mp3", "outro_voice.mp3"):
+                file.unlink(missing_ok=True)
+                continue
+    final_path = p / "video" / "final.mp4"
+    if final_path.exists():
+        try:
+            final_path.unlink()
+        except:
+            pass
+
+    # Regenerate previews/overlays if needed before export
+    generate_preview_for_project(project, db, project_id, "intro")
+    generate_preview_for_project(project, db, project_id, "outro")
+
+    project.status = "Processing"
+    project.current_stage = "Master Composition"
+    db.commit()
+
+    update_meta(project_id, {"status": "Processing", "currentStage": "Master Composition"}, PROJECTS_ROOT / project_id)
+    await broadcaster.broadcast("status_update", {"id": project_id, "status": "Processing", "currentStage": "Master Composition"})
+    background_tasks.add_task(execute_stage, project_id, "Master Composition")
+    return {"status": "started", "stage": "Master Composition"}
 
 @app.post("/projects/{project_id}/retry-stage")
 async def retry_stage(project_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db), deps = Depends(auth)):
@@ -792,6 +839,31 @@ async def retry_stage(project_id: str, background_tasks: BackgroundTasks, db: Se
     
     background_tasks.add_task(execute_stage, project_id, next_stage)
     return {"status": "retrying", "stage": next_stage}
+
+@app.post("/projects/{project_id}/run-automatically")
+async def run_automatically(project_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db), deps = Depends(auth)):
+    project = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    try:
+        idx = STAGE_SEQUENCE.index(project.current_stage)
+    except:
+        idx = -1
+    stages = STAGE_SEQUENCE[idx + 1:]
+    if "Master Composition" in stages:
+        stages = stages[:stages.index("Master Composition")]
+    if not stages:
+        return {"status": "ready_for_master"}
+
+    project.status = "Processing"
+    db.commit()
+
+    update_meta(project_id, {"status": "Processing"}, PROJECTS_ROOT / project_id)
+
+    await broadcaster.broadcast("status_update", {"id": project_id, "status": "Processing", "currentStage": project.current_stage})
+    background_tasks.add_task(execute_remaining_stages, project_id)
+    return {"status": "started"}
 
 @app.post("/projects/{project_id}/cleanup")
 def cleanup_project(project_id: str, deps = Depends(auth)):
@@ -852,9 +924,11 @@ def sync_assets_to_db():
             ASSETS_ROOT.mkdir(parents=True, exist_ok=True)
             return
             
-        categories = ["backgrounds", "intros", "endings", "music", "sfx"]
-        for cat in categories:
-            (ASSETS_ROOT / cat).mkdir(exist_ok=True)
+        default_categories = ["backgrounds", "intros", "endings", "music", "sfx", "templates", "uncategorized"]
+        for cat in default_categories:
+            if not db.query(AssetCategoryModel).filter(AssetCategoryModel.id == cat).first():
+                db.add(AssetCategoryModel(id=cat))
+        db.commit()
 
         for root, _, filenames in os.walk(ASSETS_ROOT):
             for f in filenames:
@@ -863,10 +937,11 @@ def sync_assets_to_db():
                 clean_path = str(rel_path).replace("\\", "/")
                 
                 existing = db.query(AssetModel).filter(AssetModel.id == clean_path).first()
+                category = rel_path.parts[0] if len(rel_path.parts) > 1 else "uncategorized"
+                if not db.query(AssetCategoryModel).filter(AssetCategoryModel.id == category).first():
+                    db.add(AssetCategoryModel(id=category))
                 if not existing:
                     # Determine initial category from physical folder
-                    category = rel_path.parts[0] if len(rel_path.parts) > 1 else "uncategorized"
-                    
                     new_asset = AssetModel(
                         id=clean_path,
                         name=f,
@@ -876,12 +951,65 @@ def sync_assets_to_db():
                         url=f"/assets_static/{clean_path}"
                     )
                     db.add(new_asset)
+                else:
+                    cats = json.loads(existing.categories or "[]")
+                    if category not in cats:
+                        cats.append(category)
+                        existing.categories = json.dumps(cats)
+                    if existing.name != f:
+                        existing.name = f
+                    size_value = str(f_path.stat().st_size)
+                    if existing.size != size_value:
+                        existing.size = size_value
+                    file_type_value = f_path.suffix.lower()
+                    if existing.file_type != file_type_value:
+                        existing.file_type = file_type_value
+                    url_value = f"/assets_static/{clean_path}"
+                    if existing.url != url_value:
+                        existing.url = url_value
         db.commit()
         print("Asset sync complete.")
     except Exception as e:
         print(f"Asset sync error: {e}")
     finally:
         db.close()
+
+class AssetCategoryRequest(BaseModel):
+    id: str
+
+class TemplateFieldSchema(BaseModel):
+    id: str
+    name: str
+    x: float
+    y: float
+    width: float
+    height: float
+    font: str
+    size: int
+    color: str
+    shadow: str
+    align: str
+    preview: Optional[bool] = True
+    autoFit: Optional[bool] = False
+    strokeWidth: Optional[int] = 0
+    strokeColor: Optional[str] = "#000000"
+
+class TemplateCreateRequest(BaseModel):
+    name: str
+    image_path: str
+    fields: List[TemplateFieldSchema]
+
+class TemplateUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    image_path: Optional[str] = None
+    fields: Optional[List[TemplateFieldSchema]] = None
+
+class TemplatePreviewRequest(BaseModel):
+    template_id: Optional[str] = None
+    image_path: Optional[str] = None
+    fields: Optional[List[TemplateFieldSchema]] = None
+    field_values: Optional[Dict[str, str]] = None
+    preview_aspect: Optional[str] = "16:9"
 
 @app.get("/assets")
 def list_assets(db: Session = Depends(get_db), deps = Depends(auth)):
@@ -899,6 +1027,98 @@ def list_assets(db: Session = Depends(get_db), deps = Depends(auth)):
         })
     return assets
 
+@app.get("/asset-categories")
+def list_asset_categories(db: Session = Depends(get_db), deps = Depends(auth)):
+    results = db.query(AssetCategoryModel).order_by(AssetCategoryModel.id.asc()).all()
+    return [c.id for c in results]
+
+@app.post("/asset-categories")
+def create_asset_category(body: AssetCategoryRequest, db: Session = Depends(get_db), deps = Depends(auth)):
+    raw = body.id or ""
+    clean = "".join([c for c in raw if c.isalnum() or c in "-_"]).lower()
+    if not clean:
+        raise HTTPException(status_code=400, detail="Invalid category")
+    existing = db.query(AssetCategoryModel).filter(AssetCategoryModel.id == clean).first()
+    if existing:
+        return {"status": "exists", "id": clean}
+    db.add(AssetCategoryModel(id=clean))
+    db.commit()
+    return {"status": "created", "id": clean}
+
+@app.get("/templates")
+def list_templates(db: Session = Depends(get_db), deps = Depends(auth)):
+    results = db.query(TemplateModel).order_by(TemplateModel.created_at.desc()).all()
+    return [{
+        "id": t.id,
+        "name": t.name,
+        "image_path": t.image_path,
+        "fields": json.loads(t.fields_json or "[]"),
+        "created_at": t.created_at.isoformat()
+    } for t in results]
+
+@app.post("/templates")
+def create_template(body: TemplateCreateRequest, db: Session = Depends(get_db), deps = Depends(auth)):
+    template_id = f"tpl_{uuid.uuid4().hex[:8]}"
+    new_tpl = TemplateModel(
+        id=template_id,
+        name=body.name,
+        image_path=body.image_path,
+        fields_json=json.dumps([f.dict() for f in body.fields])
+    )
+    db.add(new_tpl)
+    db.commit()
+    return {"id": template_id, "status": "created"}
+
+@app.get("/templates/{template_id}")
+def get_template(template_id: str, db: Session = Depends(get_db), deps = Depends(auth)):
+    tpl = db.query(TemplateModel).filter(TemplateModel.id == template_id).first()
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {
+        "id": tpl.id,
+        "name": tpl.name,
+        "image_path": tpl.image_path,
+        "fields": json.loads(tpl.fields_json or "[]"),
+        "created_at": tpl.created_at.isoformat()
+    }
+
+@app.patch("/templates/{template_id}")
+def update_template(template_id: str, body: TemplateUpdateRequest, db: Session = Depends(get_db), deps = Depends(auth)):
+    tpl = db.query(TemplateModel).filter(TemplateModel.id == template_id).first()
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    if body.name is not None:
+        tpl.name = body.name
+    if body.image_path is not None:
+        tpl.image_path = body.image_path
+    if body.fields is not None:
+        tpl.fields_json = json.dumps([f.dict() for f in body.fields])
+    db.commit()
+    return {"status": "updated", "id": tpl.id}
+
+@app.post("/templates/preview")
+def render_template_preview_endpoint(body: TemplatePreviewRequest, db: Session = Depends(get_db), deps = Depends(auth)):
+    template = None
+    if body.template_id:
+        template = db.query(TemplateModel).filter(TemplateModel.id == body.template_id).first()
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+
+    image_path = body.image_path or (template.image_path if template else None)
+    if not image_path:
+        raise HTTPException(status_code=400, detail="image_path is required")
+
+    fields = body.fields
+    if fields is None:
+        if not template:
+            raise HTTPException(status_code=400, detail="fields are required")
+        fields = json.loads(template.fields_json or "[]")
+
+    preview_aspect = body.preview_aspect or "16:9"
+    field_values = body.field_values or {}
+    data = render_preview_bytes(image_path, fields, field_values, preview_aspect)
+    return Response(content=data, media_type="image/png")
+
 @app.post("/assets")
 async def upload_asset(
     file: UploadFile = File(...), 
@@ -911,6 +1131,9 @@ async def upload_asset(
     # Sanitize category
     category = "".join([c for c in category if c.isalnum() or c in "-_"]).lower()
     if not category: category = "uncategorized"
+
+    if not db.query(AssetCategoryModel).filter(AssetCategoryModel.id == category).first():
+        db.add(AssetCategoryModel(id=category))
     
     save_dir = ASSETS_ROOT / category
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -1045,17 +1268,11 @@ async def execute_job_task(job_id: str):
         output_format = params.get("output_format", "mp4")
         caption_mode = params.get("caption_mode", "line")
         for project_id in harvested_projects:
-            meta_path = PROJECTS_ROOT / project_id / "meta.json"
-            if not meta_path.exists():
-                continue
-            try:
-                meta = json.loads(meta_path.read_text(encoding="utf-8"))
-                meta["asset_folder"] = asset_folder
-                meta["output_format"] = output_format
-                meta["caption_mode"] = caption_mode
-                meta_path.write_text(json.dumps(meta, indent=4))
-            except:
-                pass
+            update_meta(project_id, {
+                "asset_folder": asset_folder,
+                "output_format": output_format,
+                "caption_mode": caption_mode
+            }, PROJECTS_ROOT / project_id)
         
         # 2. Trigger processing for each project
         # In a real scenario, we might want to start them one by one or in parallel
@@ -1176,6 +1393,9 @@ def update_asset_categories(category: str, filename: str, body: UpdateCategories
         raise HTTPException(status_code=404, detail="Asset not found")
         
     asset.categories = json.dumps(body.categories)
+    for cat in body.categories:
+        if not db.query(AssetCategoryModel).filter(AssetCategoryModel.id == cat).first():
+            db.add(AssetCategoryModel(id=cat))
     db.commit()
     
     return {

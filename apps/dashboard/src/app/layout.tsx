@@ -7,6 +7,9 @@ import { Header } from "../presentation/components/Header";
 export const metadata: Metadata = {
   title: "FrameForge Dashboard",
   description: "Video Pipeline Orchestration Console",
+  icons: {
+    icon: "/FF-logo.png",
+  },
 };
 
 export default function RootLayout({

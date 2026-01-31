@@ -1,5 +1,6 @@
 "use client";
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Project } from '../../core/domain/entities/project.entity';
 import { useProject } from '../context/ProjectContext';
 import { FileBrowserModal } from './FileBrowserModal';
@@ -11,7 +12,8 @@ interface ProjectDetailProps {
 }
 
 export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project }) => {
-    const { updateProject, runNextStage, retryStage, cleanupProject, deleteProject, createShorts } = useProject();
+    const router = useRouter();
+    const { updateProject, runNextStage, retryStage, runAutomatically, cleanupProject, deleteProject } = useProject();
     const [isEditing, setIsEditing] = React.useState(false);
     const [title, setTitle] = React.useState('');
     const [isFileBrowserOpen, setIsFileBrowserOpen] = React.useState(false);
@@ -33,6 +35,19 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project }) => {
         }
     }, [project]);
 
+    const nextStage = React.useMemo(() => {
+        if (!project) return undefined;
+        return getNextStage(project.currentStage);
+    }, [project]);
+
+    React.useEffect(() => {
+        if (!project) return;
+        const readyForMaster = project.status === 'Success' && nextStage === 'Visual Production';
+        if (readyForMaster || project.currentStage === 'Visual Production') {
+            router.push(`/results/${project.id}`);
+        }
+    }, [nextStage, project, router]);
+
     if (!project) {
         return (
             <section className="flex-1 overflow-auto bg-slate-50 dark:bg-slate-900/20 p-8 flex items-center justify-center">
@@ -45,6 +60,10 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project }) => {
     }
 
     const handleRunStage = async () => {
+        if (nextStage === 'Visual Production') {
+            router.push(`/results/${project.id}`);
+            return;
+        }
         try {
             setIsRunning(true);
             await runNextStage(project.id);
@@ -83,11 +102,12 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project }) => {
         }
     };
 
-    const handleCreateShorts = async () => {
-        if (!project) return;
+    const handleRunAutomatically = async () => {
         try {
             setIsRunning(true);
-            await createShorts(project.id, 3, 60);
+            await runAutomatically(project.id);
+        } catch (error) {
+            alert('Error running automatically');
         } finally {
             setIsRunning(false);
         }
@@ -212,23 +232,12 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project }) => {
                         {project.status !== 'Cancelled' && project.currentStage !== 'Cancelled' && (
                             <div className="border-t border-slate-100 dark:border-slate-800 mt-10 pt-8">
                                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-4">Pipeline Actions</label>
-                                <div className="grid grid-cols-6 gap-3">
-                                    <button
-                                        onClick={handleRunStage}
-                                        disabled={project.status === 'Processing' || isRunning}
-                                        className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-primary/5 hover:border-primary/50 transition-all group cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <span className={`material-symbols-outlined text-slate-500 group-hover:text-primary ${isRunning ? 'animate-spin' : ''}`}>
-                                            {isRunning ? 'autorenew' : 'play_arrow'}
-                                        </span>
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 group-hover:text-primary">Run Next Stage</span>
-                                    </button>
-
+                                <div className="grid grid-cols-5 gap-3">
                                     {project.status === 'Error' ? (
                                         <button
-                                            onClick={handleRetry}
+                                            onClick={handleRunAutomatically}
                                             disabled={isRunning}
-                                            className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-rose-200 dark:border-rose-800/50 bg-rose-50/30 dark:bg-rose-500/5 hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:border-rose-400 transition-all group cursor-pointer disabled:opacity-50"
+                                            className="w-full flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-rose-200 dark:border-rose-800/50 bg-rose-50/30 dark:bg-rose-500/5 hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:border-rose-400 transition-all group cursor-pointer disabled:opacity-50"
                                         >
                                             <span className={`material-symbols-outlined text-rose-500 ${isRunning ? 'animate-spin' : ''}`}>
                                                 {isRunning ? 'autorenew' : 'refresh'}
@@ -239,41 +248,59 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project }) => {
                                         <button
                                             onClick={handleRunStage}
                                             disabled={project.status === 'Processing' || isRunning}
-                                            className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/30 dark:bg-emerald-500/5 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:border-emerald-400 transition-all group cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="w-full flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-primary/5 hover:border-primary/50 transition-all group cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <span className={`material-symbols-outlined text-slate-500 group-hover:text-primary ${isRunning ? 'animate-spin' : ''}`}>
+                                                {isRunning ? 'autorenew' : 'play_arrow'}
+                                            </span>
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 group-hover:text-primary">
+                                                {nextStage === 'Visual Production' ? 'Configure Video' : 'Run Next Stage'}
+                                            </span>
+                                        </button>
+                                    )}
+
+                                    {project.status === 'Error' ? (
+                                        <button
+                                            onClick={handleRetry}
+                                            disabled={isRunning}
+                                            className="w-full flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-rose-200 dark:border-rose-800/50 bg-rose-50/30 dark:bg-rose-500/5 hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:border-rose-400 transition-all group cursor-pointer disabled:opacity-50"
+                                        >
+                                            <span className={`material-symbols-outlined text-rose-500 ${isRunning ? 'animate-spin' : ''}`}>
+                                                {isRunning ? 'autorenew' : 'refresh'}
+                                            </span>
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-rose-500">Retry Automatically</span>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={handleRunAutomatically}
+                                            disabled={project.status === 'Processing' || isRunning}
+                                            className="w-full flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/30 dark:bg-emerald-500/5 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:border-emerald-400 transition-all group cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             <span className={`material-symbols-outlined text-emerald-600 dark:text-emerald-400 ${isRunning ? 'animate-spin' : ''}`}>
                                                 {isRunning ? 'autorenew' : 'skip_next'}
                                             </span>
-                                            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Skip Stage</span>
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Run Automatically</span>
                                         </button>
                                     )}
 
                                     <button
                                         onClick={handleCleanup}
                                         disabled={isRunning}
-                                        className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-rose-500/5 hover:border-rose-500/50 transition-all group cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-full flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-rose-500/5 hover:border-rose-500/50 transition-all group cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <span className="material-symbols-outlined text-slate-500 group-hover:text-rose-500">delete_sweep</span>
                                         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 group-hover:text-rose-500">Cleanup</span>
                                     </button>
                                     <button
-                                        onClick={handleCreateShorts}
-                                        disabled={isRunning}
-                                        className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-primary/5 hover:border-primary/50 transition-all group cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <span className="material-symbols-outlined text-slate-500 group-hover:text-primary">movie</span>
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 group-hover:text-primary">Create Shorts</span>
-                                    </button>
-                                    <button
                                         onClick={() => setIsFileBrowserOpen(true)}
-                                        className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-all group cursor-pointer ${isFileBrowserOpen ? 'bg-primary border-primary shadow-lg shadow-primary/20' : 'border-slate-200 dark:border-slate-800 hover:bg-primary/5 hover:border-primary/50'}`}
+                                        className={`w-full flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-all group cursor-pointer ${isFileBrowserOpen ? 'bg-primary border-primary shadow-lg shadow-primary/20' : 'border-slate-200 dark:border-slate-800 hover:bg-primary/5 hover:border-primary/50'}`}
                                     >
                                         <span className={`material-symbols-outlined ${isFileBrowserOpen ? 'text-white' : 'text-slate-500 group-hover:text-primary'}`}>folder_open</span>
                                         <span className={`text-[10px] font-bold uppercase tracking-widest ${isFileBrowserOpen ? 'text-white' : 'text-slate-500 group-hover:text-primary'}`}>Files</span>
                                     </button>
                                     <button
                                         onClick={handleViewContent}
-                                        className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-primary/5 hover:border-primary/50 transition-all group cursor-pointer"
+                                        className="w-full flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-primary/5 hover:border-primary/50 transition-all group cursor-pointer"
                                     >
                                         <span className="material-symbols-outlined text-slate-500 group-hover:text-primary">article</span>
                                         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 group-hover:text-primary">View Content</span>
@@ -307,6 +334,22 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project }) => {
         </section>
     );
 };
+
+const STAGE_SEQUENCE = [
+    'Source Discovery',
+    'Content Translation',
+    'Gender Analysis',
+    'Vocal Synthesis',
+    'Caption Engine',
+    'Thumbnail Forge',
+    'Visual Production'
+] as const;
+
+function getNextStage(stage: string) {
+    const idx = STAGE_SEQUENCE.indexOf(stage as typeof STAGE_SEQUENCE[number]);
+    if (idx === -1) return undefined;
+    return STAGE_SEQUENCE[idx + 1];
+}
 
 function getStatusClasses(status: string) {
     switch (status) {

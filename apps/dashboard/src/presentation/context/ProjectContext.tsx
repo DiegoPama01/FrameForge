@@ -277,6 +277,7 @@ interface ProjectContextType {
     updateProject: (id: string, data: Partial<Project>) => Promise<void>;
     runNextStage: (id: string) => Promise<void>;
     retryStage: (id: string) => Promise<void>;
+    runAutomatically: (id: string) => Promise<void>;
     cleanupProject: (id: string) => Promise<void>;
     deleteProject: (id: string, complete: boolean) => Promise<void>;
     createShorts: (id: string, count?: number, segmentLength?: number) => Promise<void>;
@@ -298,6 +299,9 @@ interface ProjectContextType {
     assets: Asset[];
     assetCategories: string[];
     refreshAssets: () => Promise<void>;
+    refreshAssetCategories: () => Promise<void>;
+    templates: any[];
+    refreshTemplates: () => Promise<void>;
 }
 
 export type LogEntry = {
@@ -319,23 +323,36 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const [globalSearch, setGlobalSearch] = useState('');
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [assets, setAssets] = useState<Asset[]>([]);
+    const [assetCategories, setAssetCategories] = useState<string[]>([]);
+    const [templates, setTemplates] = useState<any[]>([]);
 
-    const assetCategories = useMemo(() => {
-        const catsFromAssets: string[] = [];
-        assets.forEach(a => {
-            if (a.categories) {
-                a.categories.forEach(c => catsFromAssets.push(c));
-            }
-        });
+    const refreshAssetCategories = async () => {
+        try {
+            const categories = await ApiClient.getAssetCategories();
+            setAssetCategories(categories);
+        } catch (error) {
+            console.error('Failed to load asset categories', error);
+        }
+    };
 
-        const allCats = new Set([...catsFromAssets]);
-        return Array.from(allCats).sort();
-    }, [assets]);
+    const refreshTemplates = async () => {
+        try {
+            const data = await ApiClient.getTemplates();
+            setTemplates(data);
+        } catch (error) {
+            console.error('Failed to load templates', error);
+        }
+    };
 
     const refreshAssets = async () => {
         try {
-            const data = await ApiClient.getAssets();
+            const [data, categories] = await Promise.all([
+                ApiClient.getAssets(),
+                ApiClient.getAssetCategories()
+            ]);
             setAssets(data);
+            setAssetCategories(categories);
+            await refreshTemplates();
         } catch (error) {
             console.error('Failed to load assets', error);
         }
@@ -405,6 +422,19 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             await projectRepo.retryStage(id);
         } catch (error) {
             console.error('Failed to retry stage', error);
+            await refresh(true);
+        }
+    };
+
+    const runAutomatically = async (id: string) => {
+        try {
+            setProjects(prev => prev.map(p => p.id === id ? { ...p, status: 'Processing' } : p));
+            if (selectedProject?.id === id) {
+                setSelectedProject(prev => prev ? { ...prev, status: 'Processing' } : undefined);
+            }
+            await projectRepo.runAutomatically(id);
+        } catch (error) {
+            console.error('Failed to run automatically', error);
             await refresh(true);
         }
     };
@@ -621,7 +651,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         <ProjectContext.Provider value={{
             projects, jobs, workflows, selectedProject, setSelectedProject,
             loading, refresh, updateProject,
-            runNextStage, retryStage, cleanupProject, deleteProject,
+            runNextStage, retryStage, runAutomatically, cleanupProject, deleteProject,
             createJob, createWorkflow, deleteWorkflow, addNodeToWorkflow, removeNodeFromWorkflow, moveNodeInWorkflow,
             view, setView,
             globalSearch, setGlobalSearch,
@@ -630,6 +660,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             assets,
             assetCategories,
             refreshAssets,
+            refreshAssetCategories,
+            templates,
+            refreshTemplates,
             deleteJob,
             runJob,
             updateJob,

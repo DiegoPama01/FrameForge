@@ -20,6 +20,7 @@ export interface Project {
     updatedAt: string;
     duration?: string;
     content?: string;
+    thumbnail?: string;
 }
 
 export interface WorkflowNode {

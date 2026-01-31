@@ -26,7 +26,7 @@ const normalizeStage = (stage?: string): ProjectStage => {
 
 export class HttpProjectRepository implements ProjectRepository {
     async getAll(): Promise<Project[]> {
-        const projects = await ApiClient.get<{ id: string, name: string, category: string, status: string, currentStage: string, duration?: string }[]>('/projects');
+        const projects = await ApiClient.get<{ id: string, name: string, category: string, status: string, currentStage: string, duration?: string, thumbnail?: string }[]>('/projects');
         return projects.map(p => ({
             id: p.id,
             title: p.name,
@@ -35,6 +35,7 @@ export class HttpProjectRepository implements ProjectRepository {
             status: (p.status || 'Idle') as ProjectStatus,
             currentStage: normalizeStage(p.currentStage),
             duration: p.duration || undefined,
+            thumbnail: p.thumbnail,
             updatedAt: new Date().toISOString(),
         }));
     }
@@ -76,6 +77,10 @@ export class HttpProjectRepository implements ProjectRepository {
         await ApiClient.retryStage(id);
     }
 
+    async runAutomatically(id: string): Promise<void> {
+        await ApiClient.runAutomatically(id);
+    }
+
     async cleanup(id: string): Promise<void> {
         await ApiClient.cleanupProject(id);
     }
@@ -101,15 +106,7 @@ export class HttpProjectRepository implements ProjectRepository {
     }
 
     async deleteWorkflow(id: string): Promise<void> {
-        const response = await fetch(`${ApiClient['baseUrl']}/workflows/${id}`, {
-            method: 'DELETE',
-            headers: {
-                'x-worker-token': ApiClient['token'],
-            },
-        });
-        if (!response.ok) {
-            throw new Error(`Delete Workflow Failed: ${response.statusText}`);
-        }
+        await ApiClient.deleteWorkflow(id);
     }
 
     // Jobs

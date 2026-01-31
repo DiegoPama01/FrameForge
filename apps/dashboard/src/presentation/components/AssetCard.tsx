@@ -11,20 +11,21 @@ interface AssetCardProps {
         type: string;
         url: string;
     };
+    categories: string[];
     onDelete: () => void;
     onUpdate?: () => void;
+    variant?: 'asset' | 'template';
+    onEdit?: () => void;
 }
 
-export const AssetCard: React.FC<AssetCardProps> = ({ asset, onDelete, onUpdate }) => {
+export const AssetCard: React.FC<AssetCardProps> = ({ asset, categories, onDelete, onUpdate, variant = 'asset', onEdit }) => {
     const [isManagingFolders, setIsManagingFolders] = useState(false);
     const [updating, setUpdating] = useState(false);
 
-    // Get available folders from local storage
     const availableFolders = useMemo(() => {
-        const custom = JSON.parse(localStorage.getItem('custom_asset_folders') || '[]');
-        const defaults = ['backgrounds', 'intros', 'endings', 'music', 'sfx', 'uncategorized'];
-        return Array.from(new Set([...defaults, ...custom])).sort();
-    }, []);
+        const defaults = ['backgrounds', 'intros', 'endings', 'music', 'sfx', 'templates', 'uncategorized'];
+        return Array.from(new Set([...defaults, ...categories])).sort();
+    }, [categories]);
 
     const handleDelete = async () => {
         if (!confirm(`Delete ${asset.name}?`)) return;
@@ -72,7 +73,7 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, onDelete, onUpdate 
     };
 
     const getFullUrl = (url: string) => {
-        const base = process.env.NEXT_PUBLIC_WORKER_API_URL || 'http://localhost:8000';
+        const base = ApiClient.getBaseUrl();
         return `${base}${encodeURI(url)}`;
     };
 
@@ -109,20 +110,32 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, onDelete, onUpdate 
                 </div>
 
                 <div className="card-hover-actions absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 duration-300">
-                    <button
-                        onClick={() => setIsManagingFolders(!isManagingFolders)}
-                        className={`size-9 rounded-xl backdrop-blur-md flex items-center justify-center transition-all ${isManagingFolders ? 'bg-primary text-white' : 'bg-white/20 text-white hover:bg-white/40'}`}
-                        title="Manage Folders"
-                    >
-                        <span className="material-symbols-outlined text-[18px]">folder_shared</span>
-                    </button>
-                    <button
-                        onClick={handleDelete}
-                        className="size-9 rounded-xl bg-rose-500/80 backdrop-blur-md text-white hover:bg-rose-600 flex items-center justify-center transition-all"
-                        title="Delete"
-                    >
-                        <span className="material-symbols-outlined text-[18px]">delete</span>
-                    </button>
+                    {variant === 'asset' ? (
+                        <>
+                            <button
+                                onClick={() => setIsManagingFolders(!isManagingFolders)}
+                                className={`size-9 rounded-xl backdrop-blur-md flex items-center justify-center transition-all ${isManagingFolders ? 'bg-primary text-white' : 'bg-white/20 text-white hover:bg-white/40'}`}
+                                title="Manage Folders"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">folder_shared</span>
+                            </button>
+                            <button
+                                onClick={handleDelete}
+                                className="size-9 rounded-xl bg-rose-500/80 backdrop-blur-md text-white hover:bg-rose-600 flex items-center justify-center transition-all"
+                                title="Delete"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                            </button>
+                        </>
+                    ) : (
+                        <button
+                            onClick={onEdit}
+                            className="size-9 rounded-xl bg-white/20 backdrop-blur-md text-white hover:bg-white/40 flex items-center justify-center transition-all"
+                            title="Edit Template"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -138,7 +151,7 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, onDelete, onUpdate 
                     </div>
                 </div>
 
-                {isManagingFolders ? (
+                {variant === 'asset' && isManagingFolders ? (
                     <div className="animate-in fade-in slide-in-from-top-2 duration-200 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
                         {availableFolders.map(folder => {
                             const isSelected = asset.categories.includes(folder);

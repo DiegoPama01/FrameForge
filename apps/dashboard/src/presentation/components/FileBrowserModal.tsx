@@ -44,9 +44,10 @@ const getFileIcon = (path: string): string => {
 };
 
 const getFileUrl = (projectId: string, path: string): string => {
-    const baseUrl = process.env.NEXT_PUBLIC_WORKER_API_URL || 'http://localhost:8000';
-    const token = process.env.NEXT_PUBLIC_WORKER_TOKEN || '';
-    return `${baseUrl}/projects/${projectId}/files/content?path=${encodeURIComponent(path)}&token=${token}`;
+    const baseUrl = ApiClient.getBaseUrl();
+    const token = ApiClient.getToken();
+    const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
+    return `${baseUrl}/projects/${projectId}/files/content?path=${encodeURIComponent(path)}${tokenParam}`;
 };
 
 export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ projectId, isOpen, onClose }) => {

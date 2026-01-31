@@ -8,6 +8,7 @@ export const Sidebar: React.FC = () => {
 
     const menuItems = [
         { id: 'projects', label: 'Projects', icon: 'grid_view', href: '/projects' },
+        { id: 'results', label: 'Results', icon: 'movie', href: '/results' },
         { id: 'jobs', label: 'Jobs', icon: 'work', href: '/jobs' },
         { id: 'workflows', label: 'Workflows', icon: 'hub', href: '/workflows' },
         { id: 'assets', label: 'Assets', icon: 'folder', href: '/assets' },
@@ -18,11 +19,16 @@ export const Sidebar: React.FC = () => {
         <aside className="w-64 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between bg-white dark:bg-background-dark p-4 shrink-0">
             <div className="flex flex-col gap-6">
                 <div className="flex items-center gap-3 px-2">
-                    <div className="bg-primary rounded-lg p-2 text-white shadow-lg shadow-primary/20">
-                        <span className="material-symbols-outlined">movie_edit</span>
-                    </div>
-                    <div className="flex flex-col">
-                        <h1 className="text-base font-black leading-tight tracking-tight">FrameForge</h1>
+                    <img
+                        src="/FF-logo.png"
+                        alt="FrameForge"
+                        className="size-12 object-contain shrink-0"
+                    />
+                    <div className="flex flex-col justify-center">
+                        <h1 className="text-base font-black leading-tight tracking-tight">
+                            <span>Frame</span>
+                            <span className="text-primary">Forge</span>
+                        </h1>
                         <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Studio Console</p>
                     </div>
                 </div>

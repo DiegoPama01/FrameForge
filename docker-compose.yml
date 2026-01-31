@@ -38,8 +38,10 @@ services:
     environment:
       - WORKER_TOKEN=${WORKER_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DATABASE_URL=sqlite:////db/frameforge.db
     volumes:
       - ./data:/data
+      - worker_db:/db
     restart: unless-stopped
 
   dashboard:
@@ -47,7 +49,7 @@ services:
       context: ./apps/dashboard
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_WORKER_API_URL=${NEXT_PUBLIC_WORKER_API_URL:-http://localhost:8000}
+        - NEXT_PUBLIC_WORKER_API_URL=${NEXT_PUBLIC_WORKER_API_URL:-http://worker:8000}
         - NEXT_PUBLIC_WORKER_TOKEN=${WORKER_TOKEN}
     ports:
       - "3000:3000"
@@ -57,3 +59,4 @@ services:
 
 volumes:
   n8n_data:
+  worker_db:

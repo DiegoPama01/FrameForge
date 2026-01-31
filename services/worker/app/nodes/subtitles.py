@@ -1,8 +1,8 @@
 import os
-import json
 from pathlib import Path
 from typing import Dict, Any
 from .base import BaseNode
+from ..services.meta_store import load_meta
 
 try:
     from openai import OpenAI, AsyncOpenAI
@@ -15,7 +15,6 @@ class SubtitlesNode(BaseNode):
         await self.log(project_path.name, "Generating subtitles using Whisper API...")
         audio_path = project_path / "audio" / "source" / "full_audio.mp3"
         dst_path = project_path / "subtitles.srt"
-        meta_path = project_path / "meta.json"
         
         if not audio_path.exists():
             await self.log(project_path.name, "Subtitles failed: No audio found", "error")
@@ -41,12 +40,9 @@ class SubtitlesNode(BaseNode):
                 )
             
             caption_mode = "line"
-            if meta_path.exists():
-                try:
-                    meta = json.loads(meta_path.read_text(encoding="utf-8"))
-                    caption_mode = meta.get("caption_mode", caption_mode)
-                except:
-                    pass
+            meta = load_meta(project_path.name, project_path)
+            if meta:
+                caption_mode = meta.get("caption_mode", caption_mode)
 
             if str(caption_mode).lower() in ["word", "word_by_word", "word-by-word", "wordbyword"]:
                 entries = self._parse_srt_entries(response)

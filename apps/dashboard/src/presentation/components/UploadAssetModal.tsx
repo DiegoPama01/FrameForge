@@ -7,9 +7,10 @@ interface UploadAssetModalProps {
     onClose: () => void;
     onUploadSuccess: () => void;
     initialCategory?: string;
+    categories: string[];
 }
 
-export const UploadAssetModal: React.FC<UploadAssetModalProps> = ({ isOpen, onClose, onUploadSuccess, initialCategory = 'uncategorized' }) => {
+export const UploadAssetModal: React.FC<UploadAssetModalProps> = ({ isOpen, onClose, onUploadSuccess, initialCategory = 'uncategorized', categories }) => {
     const [files, setFiles] = useState<File[]>([]);
     const [category, setCategory] = useState(initialCategory);
     const [uploading, setUploading] = useState(false);
@@ -115,12 +116,14 @@ export const UploadAssetModal: React.FC<UploadAssetModalProps> = ({ isOpen, onCl
                             onChange={(e) => setCategory(e.target.value)}
                             className="w-full bg-slate-100 dark:bg-slate-700/50 border-none rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary/50"
                         >
-                            <option value="uncategorized">Uncategorized</option>
-                            <option value="backgrounds">Backgrounds</option>
-                            <option value="intros">Intros</option>
-                            <option value="endings">Endings</option>
-                            <option value="music">Music</option>
-                            <option value="sfx">SFX</option>
+                            {categories.length === 0 && (
+                                <option value="uncategorized">Uncategorized</option>
+                            )}
+                            {categories.map((cat) => (
+                                <option key={cat} value={cat}>
+                                    {cat === 'uncategorized' ? 'Uncategorized' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                                </option>
+                            ))}
                         </select>
                     </div>
 

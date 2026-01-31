@@ -15,6 +15,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ workflow, isOpen
     const [currentStep, setCurrentStep] = useState(0);
     const [scheduleInterval, setScheduleInterval] = useState<'once' | 'daily' | 'weekly'>('once');
     const [scheduleTime, setScheduleTime] = useState('09:00');
+    const [isAssetFolderOpen, setIsAssetFolderOpen] = useState(false);
 
     React.useEffect(() => {
         if (workflow?.nodes) {
@@ -164,15 +165,51 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ workflow, isOpen
                                                     options={options}
                                                 />
                                             ) : param.type === 'select' ? (
-                                                <select
-                                                    value={params[param.id]}
-                                                    onChange={(e) => handleParamChange(param.id, e.target.value)}
-                                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none cursor-pointer"
-                                                >
-                                                    {options.map(opt => (
-                                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                                    ))}
-                                                </select>
+                                                param.id === 'asset_folder' ? (
+                                                    <div className="relative">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIsAssetFolderOpen((prev) => !prev)}
+                                                            className="w-full flex items-center justify-between gap-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 hover:cursor-pointer"
+                                                        >
+                                                            <span>{options.find(opt => opt.value === params[param.id])?.label ?? 'Select'}</span>
+                                                            <span className="material-symbols-outlined text-lg text-slate-400">expand_more</span>
+                                                        </button>
+                                                        {isAssetFolderOpen && (
+                                                            <>
+                                                                <div className="fixed inset-0 z-10" onClick={() => setIsAssetFolderOpen(false)}></div>
+                                                                <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
+                                                                    {options.map(opt => (
+                                                                        <button
+                                                                            key={opt.value}
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                handleParamChange(param.id, opt.value);
+                                                                                setIsAssetFolderOpen(false);
+                                                                            }}
+                                                                            className={`w-full text-left px-4 py-2 text-sm transition-colors hover:cursor-pointer ${params[param.id] === opt.value
+                                                                                ? 'text-primary font-bold bg-primary/10'
+                                                                                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                                                                }`}
+                                                                        >
+                                                                            {opt.label}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <select
+                                                        value={params[param.id]}
+                                                        onChange={(e) => handleParamChange(param.id, e.target.value)}
+                                                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none cursor-pointer"
+                                                    >
+                                                        {options.map(opt => (
+                                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                        ))}
+                                                    </select>
+                                                )
                                             ) : param.type === 'boolean' ? (
                                                 <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                                                     <input

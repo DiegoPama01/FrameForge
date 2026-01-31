@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from typing import Dict, Any, Optional
 from .base import BaseNode
+from ..services.meta_store import load_meta, update_meta
 
 # Using OpenAI for Translation
 try:
@@ -13,16 +14,18 @@ except ImportError:
 
 class TranslationNode(BaseNode):
     async def execute(self, project_path: Path, context: Dict[str, Any]) -> bool:
-        meta_path = project_path / "meta.json"
         src_path = project_path / "text" / "story.txt"
         dst_path = project_path / "text" / "story_translated.txt"
         
-        if not src_path.exists() or not meta_path.exists():
+        if not src_path.exists():
             await self.log(project_path.name, "Missing files for translation", "error")
             return False
             
         try:
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            meta = load_meta(project_path.name, project_path)
+            if not meta:
+                await self.log(project_path.name, "Missing project metadata", "error")
+                return False
             original_text = src_path.read_text(encoding="utf-8")
             original_title = meta.get("title", "")
             
@@ -69,9 +72,10 @@ Story Body:
             data = json.loads(result_json)
             
             dst_path.write_text(data["translation_es"], encoding="utf-8")
-            meta["narrator_gender"] = data.get("narrator_gender", "unknown")
-            meta["title_es"] = data.get("title_es", original_title)
-            meta_path.write_text(json.dumps(meta, indent=4), encoding="utf-8")
+            update_meta(project_path.name, {
+                "narrator_gender": data.get("narrator_gender", "unknown"),
+                "title_es": data.get("title_es", original_title)
+            }, project_path)
             
             await self.log(project_path.name, "Translation completed successfully", "success")
             return True

@@ -12,6 +12,8 @@ FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg ca-certificates python3 python3-venv \
+    libjpeg62-turbo libpng16-16 libfreetype6 zlib1g \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Whisper binary + models + libraries
@@ -22,7 +24,7 @@ COPY --from=whisper-build /opt/whisper.cpp/models /opt/whisper.cpp/models
 
 RUN python3 -m venv /opt/venv \
     && /opt/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel \
-    && /opt/venv/bin/pip install --no-cache-dir "fastapi==0.115.*" "uvicorn==0.34.*" "httpx" "feedparser" "beautifulsoup4" "sqlalchemy" "openai" "python-multipart" "aiofiles" \
+    && /opt/venv/bin/pip install --no-cache-dir "fastapi==0.115.*" "uvicorn==0.34.*" "httpx" "feedparser" "beautifulsoup4" "sqlalchemy" "openai" "python-multipart" "aiofiles" "Pillow" \
     && /opt/venv/bin/pip install --no-cache-dir --upgrade edge-tts
 
 ENV PATH="/opt/venv/bin:$PATH"

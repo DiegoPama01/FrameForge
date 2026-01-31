@@ -15,19 +15,43 @@ export default function ProjectsPage() {
     const [onlyErrors, setOnlyErrors] = useState(false);
 
     // Derived data for filters
+    const readyStages = useMemo(() => [
+        'Source Discovery',
+        'Content Translation',
+        'Gender Analysis',
+        'Vocal Synthesis',
+        'Caption Engine',
+        'Thumbnail Forge',
+        'Visual Production'
+    ], []);
+
+    const getNextStage = (stage: string) => {
+        const idx = readyStages.indexOf(stage);
+        if (idx === -1) return undefined;
+        return readyStages[idx + 1];
+    };
+
+    const visibleProjects = useMemo(() => {
+        return projects.filter((project) => {
+            const nextStage = getNextStage(project.currentStage);
+            const ready = project.currentStage === 'Visual Production' || (project.status === 'Success' && nextStage === 'Visual Production');
+            return !ready;
+        });
+    }, [projects, readyStages]);
+
     const categories = useMemo(() => {
-        const cats = new Set(projects.map(p => p.category).filter((c): c is string => !!c));
+        const cats = new Set(visibleProjects.map(p => p.category).filter((c): c is string => !!c));
         return ['All', ...Array.from(cats)].sort();
-    }, [projects]);
+    }, [visibleProjects]);
 
     const statuses = useMemo(() => {
-        const stats = new Set(projects.map(p => p.status).filter((s): s is any => !!s));
+        const stats = new Set(visibleProjects.map(p => p.status).filter((s): s is any => !!s));
         return ['All', ...Array.from(stats)].sort();
-    }, [projects]);
+    }, [visibleProjects]);
 
     // Filtered projects
     const filteredProjects = useMemo(() => {
-        return projects.filter(p => {
+        return visibleProjects.filter(p => {
             const matchGlobal = p.title.toLowerCase().includes(globalSearch.toLowerCase()) ||
                 p.id.toLowerCase().includes(globalSearch.toLowerCase());
             const matchStatus = statusFilter === 'All' || p.status === statusFilter;
@@ -35,7 +59,7 @@ export default function ProjectsPage() {
             const matchError = !onlyErrors || p.status === 'Error';
             return matchGlobal && matchStatus && matchCategory && matchError;
         });
-    }, [projects, statusFilter, categoryFilter, onlyErrors, globalSearch]);
+    }, [visibleProjects, statusFilter, categoryFilter, onlyErrors, globalSearch]);
 
     return (
         <div className="flex flex-col h-full overflow-hidden">

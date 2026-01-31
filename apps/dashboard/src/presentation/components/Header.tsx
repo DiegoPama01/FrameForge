@@ -9,7 +9,10 @@ export const Header: React.FC = () => {
     return (
         <header className="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 bg-white dark:bg-background-dark/50 backdrop-blur-sm shrink-0">
             <div className="flex items-center gap-4 flex-1">
-                <h2 className="text-lg font-bold tracking-tight">FrameForge</h2>
+                <h2 className="text-lg font-bold tracking-tight">
+                    <span>Frame</span>
+                    <span className="text-primary">Forge</span>
+                </h2>
                 <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 mx-2"></div>
                 <div className="relative max-w-sm w-full">
                     <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>

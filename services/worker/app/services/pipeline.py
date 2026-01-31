@@ -2,7 +2,6 @@ import asyncio
 import base64
 import shutil
 import re
-import json
 import os
 import random
 import httpx
@@ -10,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from sqlalchemy.orm import Session
 from ..database import ProjectModel, SessionLocal
+from .meta_store import load_meta, update_meta
 from ..broadcaster import broadcaster
 
 from ..broadcaster import broadcaster
@@ -35,6 +35,35 @@ STAGE_SEQUENCE = [
     'Master Composition'
 ]
 
+async def execute_remaining_stages(project_id: str):
+    db = SessionLocal()
+    try:
+        project = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+        if not project:
+            return
+        current = project.current_stage
+        try:
+            idx = STAGE_SEQUENCE.index(current)
+        except:
+            idx = -1
+        stages = STAGE_SEQUENCE[idx + 1:]
+        if "Master Composition" in stages:
+            stages = stages[:stages.index("Master Composition")]
+    finally:
+        db.close()
+
+    for stage in stages:
+        await execute_stage(project_id, stage)
+        check_db = SessionLocal()
+        try:
+            updated = check_db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+            if not updated:
+                return
+            if updated.status == "Error":
+                break
+        finally:
+            check_db.close()
+
 async def execute_stage(project_id: str, stage: str):
     db = SessionLocal()
     try:
@@ -50,15 +79,7 @@ async def execute_stage(project_id: str, stage: str):
         project.updated_at = datetime.utcnow()
         db.commit()
 
-        # Update meta.json for instant UI feedback
-        meta_path = p / "meta.json"
-        if meta_path.exists():
-            try:
-                meta = json.loads(meta_path.read_text())
-                meta["status"] = "Processing"
-                meta["currentStage"] = stage
-                meta_path.write_text(json.dumps(meta, indent=4))
-            except: pass
+        update_meta(project_id, {"status": "Processing", "currentStage": stage}, p)
 
         print(f"--- Executing pipeline stage '{stage}' for {project_id}")
         await broadcaster.broadcast("log", {"level": "info", "message": f"Starting stage '{stage}' for project {project_id}", "project_id": project_id})
@@ -88,13 +109,7 @@ async def execute_stage(project_id: str, stage: str):
             project.status = "Success"
             print(f"--- Stage '{stage}' success")
             await broadcaster.broadcast("log", {"level": "success", "message": f"Stage '{stage}' completed successfully", "project_id": project_id})
-            duration_value = None
-            if meta_path.exists():
-                try:
-                    meta = json.loads(meta_path.read_text())
-                    duration_value = meta.get("duration")
-                except:
-                    pass
+            duration_value = load_meta(project_id, p).get("duration")
             payload = {"id": project_id, "status": "Success", "currentStage": stage}
             if duration_value:
                 payload["duration"] = duration_value
@@ -110,14 +125,7 @@ async def execute_stage(project_id: str, stage: str):
         project.updated_at = datetime.utcnow()
         db.commit()
 
-        # Final sync filesystem metadata
-        if meta_path.exists():
-            try:
-                meta = json.loads(meta_path.read_text())
-                meta["status"] = project.status
-                meta["currentStage"] = project.current_stage
-                meta_path.write_text(json.dumps(meta, indent=4))
-            except: pass
+        update_meta(project_id, {"status": project.status, "currentStage": project.current_stage}, p)
 
     except Exception as e:
         print(f"--- Critical error in stage {stage}: {e}")
