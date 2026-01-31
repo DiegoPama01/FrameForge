@@ -1,182 +1,151 @@
 # FrameForge
 
-Stack local para generar vídeos de forma automática a partir de audio y texto.
-Diseñado para funcionar completamente en Docker (Windows hoy, Ubuntu mañana).
+Local stack to generate videos automatically from text and audio. Designed to run fully in Docker.
 
 ---
 
-## Componentes
+## Components
 
-- **n8n**  
-  Orquestación del workflow (colas, estados, reintentos).
-
-- **worker**  
-  API que ejecuta las etapas del pipeline (audio, transcripción, vídeo) mediante jobs asíncronos.
-
-- **dashboard**  
-  Frontend en Next.js para controlar proyectos, jobs y configuración.
-
-- **/data**  
-  Bind mount local con proyectos, outputs, configuración y logs.
+- **n8n**
+  Workflow orchestration (queues, retries, schedules).
+- **worker**
+  API that executes the pipeline (scrape, translate, TTS, subtitles, video, mastering).
+- **dashboard**
+  Next.js frontend to control projects, jobs, assets, templates, and settings.
+- **/data**
+  Bind mount with projects, outputs, config, and logs.
 
 ---
 
-## 📁 Estructura del repositorio
+## What It Does Today (MVP1)
 
-```text
-frameforge/
-├── docker-compose.yml      # Orquestación de servicios
-├── .env.example            # Variables de entorno de ejemplo
-├── README.md               # Documentación principal
-├── apps/
-│   └── dashboard/          # Frontend / panel de control
-├── services/
-│   ├── worker/             # Procesos en segundo plano
-│   └── n8n/                # Servicio de automatización n8n
-├── workflows/
-│   └── n8n/                # Workflows de n8n
-└── data/                   # Volúmenes y datos persistentes
-```
-
-
----
-
-## Persistencia
-
-- **n8n** guarda workflows, credenciales y ejecuciones en el volumen Docker:
-  - `n8n_data`
-
-- **Proyectos y outputs** se guardan en:
-  - `./data` → montado como `/data` dentro de los contenedores
-
-⚠️ **Si borras el volumen `n8n_data`, pierdes workflows y credenciales de n8n.**
+- Reddit ingestion (source discovery) with configurable subreddits and limits.
+- Pipeline stages:
+  - Translation + narrator gender detection (OpenAI).
+  - Voice synthesis (local edge-tts).
+  - Subtitles generation (local whisper.cpp, fixed ES).
+  - Visuals + mastering (backgrounds, transitions, output format).
+  - Intro/Outro segments (video or template based).
+  - Final export and optional shorts generation.
+- Jobs and schedules (once/daily/weekly).
+- Asset library:
+  - Upload and category management.
+  - Templates with editable fields and preview rendering.
+- Dashboard UI for:
+  - Projects, logs, workflows, jobs.
+  - Assets and templates.
+  - Results page to edit mastering settings and preview intro/outro.
 
 ---
 
-## Requisitos
+## Services
 
-- Docker
-- Docker Compose
+- Dashboard: http://localhost:3000
+- Worker API: http://localhost:8000/health
+- n8n: http://localhost:5678
 
 ---
 
-## Configuración inicial
+## Quick Start
 
-1. Copiar variables de entorno:
+1) Copy environment file:
 ```bash
 cp .env.example .env
 ```
 
-2. Editar .env y definir los tokens necesarios para n8n.
+2) Set tokens:
 ```bash
-WORKER_TOKEN=aqui_poner_un_token
-N8N_TOKEN=aqui_poner_otro_token
+WORKER_TOKEN=your_token_here
+N8N_TOKEN=your_token_here
+OPENAI_API_KEY=your_openai_key_here
 ```
 
-3. Iniciar servicios:
-```bash
-docker compose up -d
-```
-
-
-## Arranque del stack
+3) Start stack:
 ```bash
 docker compose up -d --build
 ```
 
+---
 
-## Servicios disponibles:
+## Data Layout (/data)
 
-Dashboard: http://localhost:3000
+All runtime state lives here and is not versioned.
 
-Worker API: http://localhost:8000/health
-
-n8n: http://localhost:5678
-
-
-## Carpeta /data (runtime)
-
-Todo el estado operativo vive aquí y no se versiona.
-
-Estructura recomendada por proyecto:
-
+Example project structure:
 ```text
 /data/projects/<project_id>/
-├─ project.json
-├─ audio/
-│  ├─ source/
-│  │  └─ voice.mp3
-│  ├─ clean/
-│  │  └─ audio_clean.wav
-│  └─ tmp/
-├─ text/
-│  ├─ subtitles.srt
-│  └─ tmp/
-├─ video/
-│  ├─ source/
-│  ├─ work/
-│  └─ final/
-│     └─ final.mp4
-└─ logs/
-   └─ jobs/
+├── audio/
+│  ├── source/
+│  └── clean/
+├── text/
+│  ├── story.txt
+│  ├── story_translated.txt
+│  └── subtitles.srt
+├── video/
+│  ├── parts/
+│  └── final.mp4
+├── meta.json
+└── logs/
 ```
 
+---
 
-## Exportar workflows de n8n
+## OpenAI vs Local
 
-Desde la UI de n8n:
+- **OpenAI calls (cloud):**
+  - Translation + narrator gender (`gpt-5-mini`).
+  - Thumbnail prompt + image generation (`gpt-5-mini` + `gpt-image-1`).
+- **Local (no cloud):**
+  - Subtitles with whisper.cpp (fixed language: ES).
+  - TTS with edge-tts.
 
-1. Abrir workflow
+---
 
-2. Menú (⋮)
+## Copyright & Responsible Use
 
-3. Export
+FrameForge is a tool. You are responsible for the content you ingest and publish.
 
-4. Guardar el JSON en workflows/n8n/
+- Ensure you have rights to any text, audio, video, music, images, and templates you use.
+- Reddit content and user-generated content may be copyrighted and subject to platform terms.
+- Do not publish material that violates copyright, privacy, or platform policies.
 
-Recomendación: exportar tras cada cambio importante.
+---
 
+## Code Rights / License
 
+This project is released under a **non-commercial license**.  
+Commercial use is not permitted without prior written permission.
 
-## Backup del volumen de n8n
+---
 
-1. Crear backup
-```bash
-docker run --rm \
-  -v frameforge_n8n_data:/volume \
-  -v "$PWD":/backup \
-  alpine \
-  tar czf /backup/n8n_data_backup.tar.gz -C /volume .
-```
+## Development & Debug
 
-2. Restaurar backup
-```bash
-    ⚠️ Esto sobrescribe el estado actual de n8n.
-
-docker compose down
-docker volume rm frameforge_n8n_data
-
-docker volume create frameforge_n8n_data
-docker run --rm \
-  -v frameforge_n8n_data:/volume \
-  -v "$PWD":/backup \
-  alpine \
-  sh -lc "cd /volume && tar xzf /backup/n8n_data_backup.tar.gz"
-
-docker compose up -d
-```
-
-## Desarrollo y debug
-
-1. Ver logs
+View logs:
 ```bash
 docker compose logs -f worker
 docker compose logs -f dashboard
 docker compose logs -f n8n
 ```
 
-2. Rebuild de un servicio
+Rebuild one service:
 ```bash
 docker compose build --no-cache worker
 docker compose up -d --force-recreate worker
 ```
+
+---
+
+## MVP2 Plan (Next)
+
+- **Utilities API** (no workflow required):
+  - Upload video/audio and generate subtitles.
+  - Transcription (text + timestamps).
+  - TTS (text -> audio).
+  - Quick preview (frame + overlay).
+- **Main workflow** (smart long vs short):
+  - Detect duration and branch into short vs long.
+  - Short: pre-defined background and short settings.
+  - Long: full render, then auto-generate shorts.
+  - Separate profiles: `short_profile` / `long_profile`.
+- **Publishing node**:
+  - YouTube upload (OAuth2, resumable, thumbnail, scheduling).
