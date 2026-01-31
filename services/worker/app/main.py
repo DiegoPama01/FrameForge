@@ -939,13 +939,22 @@ async def upload_asset(
     save_dir = ASSETS_ROOT / category
     save_dir.mkdir(parents=True, exist_ok=True)
     
-    file_path = save_dir / file.filename
-    clean_path = f"{category}/{file.filename}"
+    safe_name = Path(file.filename or "").name
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    file_path = save_dir / safe_name
+    clean_path = f"{category}/{safe_name}"
     
     try:
-        content = await file.read()
+        size = 0
         with open(file_path, "wb") as f:
-            f.write(content)
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                size += len(chunk)
+                f.write(chunk)
+        await file.close()
                 
         # Save to DB
         existing = db.query(AssetModel).filter(AssetModel.id == clean_path).first()
@@ -957,10 +966,10 @@ async def upload_asset(
         else:
             new_asset = AssetModel(
                 id=clean_path,
-                name=file.filename,
+                name=safe_name,
                 categories=json.dumps([category]),
-                size=str(len(content)),
-                file_type=Path(file.filename).suffix.lower(),
+                size=str(size),
+                file_type=Path(safe_name).suffix.lower(),
                 url=f"/assets_static/{clean_path}"
             )
             db.add(new_asset)
@@ -969,7 +978,7 @@ async def upload_asset(
         
         return {
             "status": "ok", 
-            "filename": file.filename, 
+            "filename": safe_name, 
             "categories": [category],
             "path": clean_path,
             "url": f"/assets_static/{clean_path}"
@@ -1080,15 +1089,29 @@ async def execute_job_task(job_id: str):
         thumbnail = params.get("thumbnail", "")
 
         def build_intro_outro_config(prefix: str) -> Optional[Dict[str, Any]]:
+            direct = params.get(f"{prefix}_config")
+            if isinstance(direct, dict):
+                mode = direct.get("mode", "compose")
+                if mode == "none":
+                    return None
+                if mode == "video" and not direct.get("video"):
+                    return None
+                if mode == "compose" and not (direct.get("templateId") or direct.get("text")):
+                    return None
+                return direct
+
             mode = params.get(f"{prefix}_mode", "compose")
-            template_id = params.get(f"{prefix}_template_id", "")
+            template_id = params.get(f"{prefix}_template_id", "") or params.get(f"{prefix}_templateId", "")
             video = params.get(f"{prefix}_video", "")
             text = params.get(f"{prefix}_text", "")
             voice = params.get(f"{prefix}_voice", "same")
-            preview_aspect = params.get(f"{prefix}_preview_aspect", "16:9")
-            template_fields = params.get(f"{prefix}_template_fields", {}) or {}
+            preview_aspect = params.get(f"{prefix}_preview_aspect", "16:9") or params.get(f"{prefix}_previewAspect", "16:9")
+            template_fields = params.get(f"{prefix}_template_fields", {}) or params.get(f"{prefix}_templateFields", {}) or {}
+
             if mode == "none":
                 return None
+            if mode == "compose" and not (template_id or text) and video:
+                mode = "video"
             if mode == "video" and not video:
                 return None
             if mode == "compose" and not (template_id or text):
@@ -1135,6 +1158,16 @@ async def execute_job_task(job_id: str):
             if outro_config:
                 payload["outro_config"] = outro_config
             update_meta(project_id, payload, PROJECTS_ROOT / project_id)
+            if intro_config or outro_config:
+                try:
+                    project = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+                    if project:
+                        if intro_config and (intro_config.get("mode") == "video" or intro_config.get("templateId")):
+                            generate_preview_for_project(project, db, project_id, "intro")
+                        if outro_config and (outro_config.get("mode") == "video" or outro_config.get("templateId")):
+                            generate_preview_for_project(project, db, project_id, "outro")
+                except Exception:
+                    pass
         
         # 2. Trigger processing for each project
         # In a real scenario, we might want to start them one by one or in parallel

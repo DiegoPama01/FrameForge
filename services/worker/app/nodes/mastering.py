@@ -67,6 +67,7 @@ class MasteringNode(BaseNode):
 
         await self.log(project_path.name, "Building background track for final export...")
         bg_ok = await self._build_background_video(
+            project_path.name,
             main_bg,
             duration,
             target_w,
@@ -171,6 +172,7 @@ class MasteringNode(BaseNode):
 
     async def _build_background_video(
         self,
+        project_id: str,
         output_path: Path,
         duration: float,
         target_w: int,
@@ -183,7 +185,7 @@ class MasteringNode(BaseNode):
         transition_type: str
     ) -> bool:
         await self.log(
-            output_path.parent.parent.name,
+            project_id,
             f"Background config: mode={mode} folder={asset_folder} single={background_video or '-'} "
             f"segment={segment_minutes}m strategy={selection_strategy} transition={transition_type}",
             "info"
@@ -191,31 +193,31 @@ class MasteringNode(BaseNode):
         if mode == "single" and background_video:
             src = ASSETS_ROOT / background_video
             if not src.exists():
-                await self.log(output_path.parent.parent.name, f"Background video not found: {background_video}", "error")
+                await self.log(project_id, f"Background video not found: {background_video}", "error")
             else:
-                await self.log(output_path.parent.parent.name, f"Using single background video: {background_video}", "info")
-                return await self._build_looped_video(src, duration, target_w, target_h, output_path)
+                await self.log(project_id, f"Using single background video: {background_video}", "info")
+                return await self._build_looped_video(src, duration, target_w, target_h, output_path, project_id)
 
         candidates = self._collect_candidates(asset_folder)
         if not candidates:
-            await self.log(output_path.parent.parent.name, f"No background videos found in {asset_folder}", "error")
+            await self.log(project_id, f"No background videos found in {asset_folder}", "error")
             return False
-        await self.log(output_path.parent.parent.name, f"Background candidates: {len(candidates)}", "info")
+        await self.log(project_id, f"Background candidates: {len(candidates)}", "info")
 
         segment_len = max(10.0, float(segment_minutes or 2) * 60.0)
         await self.log(
-            output_path.parent.parent.name,
+            project_id,
             f"Background target duration={duration:.1f}s segment_len={segment_len:.1f}s",
             "info"
         )
         segments = await self._plan_segments(candidates, duration, segment_len, selection_strategy, transition_type)
         await self.log(
-            output_path.parent.parent.name,
+            project_id,
             "Segments: " + ", ".join([f"{s['path'].name}@{s['duration']:.1f}s" for s in segments]),
             "info"
         )
         await self.log(
-            output_path.parent.parent.name,
+            project_id,
             "Segments detail: " + ", ".join([
                 f"{s['path'].name} start={s['start']:.1f}s dur={s['duration']:.1f}s loop={'yes' if s['loop'] else 'no'}"
                 for s in segments
@@ -224,8 +226,12 @@ class MasteringNode(BaseNode):
         )
 
         if transition_type == "cut":
-            return await self._build_segments_cut(segments, target_w, target_h, output_path)
-        return await self._build_segments_xfade(segments, target_w, target_h, output_path, transition_type)
+            return await self._build_segments_cut(segments, target_w, target_h, output_path, project_id)
+        xfade_ok = await self._build_segments_xfade(segments, target_w, target_h, output_path, transition_type, project_id)
+        if xfade_ok:
+            return True
+        await self.log(project_id, "Background xfade failed, retrying with cut...", "error")
+        return await self._build_segments_cut(segments, target_w, target_h, output_path, project_id)
 
     def _collect_candidates(self, asset_folder: str) -> List[Path]:
         candidates: List[Path] = []
@@ -258,8 +264,8 @@ class MasteringNode(BaseNode):
             if folder.exists():
                 candidates = [p for p in folder.rglob("*") if p.suffix.lower() in VIDEO_EXTS]
 
-        # Last resort: scan all assets
-        if not candidates and ASSETS_ROOT.exists():
+        # Last resort: scan all assets (only when no category was requested)
+        if not candidates and not asset_folder and ASSETS_ROOT.exists():
             candidates = [p for p in ASSETS_ROOT.rglob("*") if p.suffix.lower() in VIDEO_EXTS]
 
         return candidates
@@ -312,7 +318,8 @@ class MasteringNode(BaseNode):
         duration: float,
         target_w: int,
         target_h: int,
-        output_path: Path
+        output_path: Path,
+        project_id: Optional[str] = None
     ) -> bool:
         vf = self._scale_filter(target_w, target_h)
         cmd = [
@@ -328,14 +335,15 @@ class MasteringNode(BaseNode):
             "-crf", "23",
             str(output_path)
         ]
-        return await self._run_ffmpeg(cmd)
+        return await self._run_ffmpeg(cmd, project_id, "looped background")
 
     async def _build_segments_cut(
         self,
         segments: List[Dict[str, Any]],
         target_w: int,
         target_h: int,
-        output_path: Path
+        output_path: Path,
+        project_id: Optional[str] = None
     ) -> bool:
         temp_files: List[Path] = []
         vf = self._scale_filter(target_w, target_h)
@@ -349,7 +357,7 @@ class MasteringNode(BaseNode):
                 cmd += ["-ss", f"{segment['start']:.2f}"]
             cmd += ["-t", f"{segment['duration']:.2f}", "-i", str(segment["path"])]
             cmd += ["-vf", vf, "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", str(temp_path)]
-            ok = await self._run_ffmpeg(cmd)
+            ok = await self._run_ffmpeg(cmd, project_id, f"bg segment {idx + 1}")
             if not ok:
                 return False
 
@@ -367,7 +375,7 @@ class MasteringNode(BaseNode):
             "-crf", "23",
             str(output_path)
         ]
-        return await self._run_ffmpeg(cmd)
+        return await self._run_ffmpeg(cmd, project_id, "concat background")
 
     async def _build_segments_xfade(
         self,
@@ -375,10 +383,11 @@ class MasteringNode(BaseNode):
         target_w: int,
         target_h: int,
         output_path: Path,
-        transition_type: str
+        transition_type: str,
+        project_id: Optional[str] = None
     ) -> bool:
         if len(segments) == 1:
-            return await self._build_segments_cut(segments, target_w, target_h, output_path)
+            return await self._build_segments_cut(segments, target_w, target_h, output_path, project_id)
 
         transition = "fade"
         if transition_type == "blur_fade":
@@ -395,7 +404,7 @@ class MasteringNode(BaseNode):
 
         filter_parts = []
         for idx in range(len(segments)):
-            filter_parts.append(f"[{idx}:v]{vf_scale},format=yuv420p[v{idx}]")
+            filter_parts.append(f"[{idx}:v]{vf_scale},fps=30,format=yuv420p,settb=1/1000[v{idx}]")
 
         offset = segments[0]["duration"] - TRANSITION_DURATION
         chain = "v0"
@@ -417,7 +426,7 @@ class MasteringNode(BaseNode):
             "-crf", "23",
             str(output_path)
         ]
-        return await self._run_ffmpeg(cmd)
+        return await self._run_ffmpeg(cmd, project_id, "xfade background")
 
     async def _apply_subtitles(
         self,
@@ -501,8 +510,11 @@ class MasteringNode(BaseNode):
         vf = self._scale_filter(target_w, target_h)
         if config.get("video"):
             bg = ASSETS_ROOT / config.get("video")
-            if bg.exists() and overlay_path.exists():
-                ok = await self._build_overlay_video(bg, overlay_path, duration, target_w, target_h, output_path)
+            if bg.exists():
+                if overlay_path.exists():
+                    ok = await self._build_overlay_video(bg, overlay_path, duration, target_w, target_h, output_path)
+                else:
+                    ok = await self._build_looped_video(bg, duration, target_w, target_h, output_path)
             elif preview_path.exists():
                 ok = await self._build_still_video(preview_path, duration, vf, output_path)
             else:
@@ -829,7 +841,7 @@ class MasteringNode(BaseNode):
         cmd = ["ffmpeg", "-y", *inputs, "-filter_complex", filter_complex, "-map", "[aout]", "-c:a", "aac", "-b:a", "192k", str(output_path)]
         return await self._run_ffmpeg(cmd)
 
-    async def _run_ffmpeg(self, cmd: List[str]) -> bool:
+    async def _run_ffmpeg(self, cmd: List[str], project_id: Optional[str] = None, context: str = "ffmpeg") -> bool:
         try:
             process = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -838,6 +850,9 @@ class MasteringNode(BaseNode):
             )
             _, stderr = await process.communicate()
             if process.returncode != 0:
+                if project_id:
+                    err_msg = stderr.decode(errors="ignore")[-600:]
+                    await self.log(project_id, f"{context} failed: {err_msg}", "error")
                 return False
         except:
             return False

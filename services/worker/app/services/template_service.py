@@ -169,6 +169,12 @@ def _extract_video_frame(video_path: Path, output_path: Path, width: int, height
     return result.returncode == 0 and output_path.exists()
 
 
+def _preview_dimensions(preview_aspect: str) -> Tuple[int, int]:
+    if preview_aspect == "9:16":
+        return 720, 1280
+    return 1280, 720
+
+
 def _resolve_crop(width: int, height: int, preview_aspect: str) -> Tuple[int, int, int, int]:
     target_ar = 16 / 9
     if preview_aspect == "9:16":
@@ -308,6 +314,7 @@ def generate_preview_for_project(project: ProjectModel, db: Session, project_id:
     mode = config.get("mode", "compose")
     output_path = DATA_ROOT / "projects" / project_id / "video" / "parts" / f"{preview_type}_preview.png"
 
+    preview_aspect = config.get("previewAspect", "16:9")
     if mode == "video":
         video_path = config.get("video")
         if not video_path:
@@ -316,30 +323,36 @@ def generate_preview_for_project(project: ProjectModel, db: Session, project_id:
         if not src.exists():
             return
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        _extract_video_frame(src, output_path, 1280, 720)
+        width, height = _preview_dimensions(preview_aspect)
+        _extract_video_frame(src, output_path, width, height)
         return
 
     template_id = config.get("templateId")
     if not template_id:
+        if config.get("video"):
+            src = ASSETS_ROOT / config.get("video")
+            if src.exists():
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                width, height = _preview_dimensions(preview_aspect)
+                _extract_video_frame(src, output_path, width, height)
         return
     template = db.query(TemplateModel).filter(TemplateModel.id == template_id).first()
     if not template:
         return
 
+    placeholder_values = _build_placeholder_values(meta, project)
     background_video = None
     if config.get("video"):
         candidate = ASSETS_ROOT / config.get("video")
         if candidate.exists():
             background_video = candidate
 
-    preview_aspect = config.get("previewAspect", "16:9")
-    placeholder_values = _build_placeholder_values(meta, project)
     field_values = config.get("templateFields") or {}
     if config.get("text"):
         for key in ("text", "overlay", "overlay_text"):
             field_values.setdefault(key, str(config.get("text")))
-    overlay_path = DATA_ROOT / "projects" / project_id / "video" / "parts" / f"{preview_type}_overlay.png"
 
+    overlay_path = DATA_ROOT / "projects" / project_id / "video" / "parts" / f"{preview_type}_overlay.png"
     render_template_preview(
         ASSETS_ROOT / template.image_path,
         json.loads(template.fields_json or "[]"),

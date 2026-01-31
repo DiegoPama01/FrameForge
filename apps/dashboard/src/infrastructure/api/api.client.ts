@@ -2,10 +2,24 @@ export class ApiClient {
     private static token = process.env.NEXT_PUBLIC_WORKER_TOKEN || '';
 
     private static resolveBaseUrl(): string {
+        const publicRaw = process.env.NEXT_PUBLIC_WORKER_API_URL_PUBLIC;
+        if (publicRaw && typeof window !== 'undefined') {
+            return publicRaw;
+        }
         const raw = process.env.NEXT_PUBLIC_WORKER_API_URL;
         if (!raw) return '/api';
         if (raw.startsWith('/') || raw.startsWith('.')) return raw;
-        if (typeof window !== 'undefined') return '/api';
+        if (typeof window !== 'undefined') {
+            try {
+                const host = window.location.hostname;
+                if (raw.includes('worker') || raw.includes('localhost')) {
+                    return `http://${host}:8000`;
+                }
+            } catch {
+                // Fall through to proxy
+            }
+            return '/api';
+        }
         return raw;
     }
 
@@ -231,7 +245,8 @@ export class ApiClient {
         });
 
         if (!response.ok) {
-            throw new Error(`Upload Failed: ${response.statusText}`);
+            const detail = await response.text();
+            throw new Error(`Upload Failed: ${detail || response.statusText}`);
         }
         return response.json();
     }

@@ -4,6 +4,23 @@ import { Workflow, WorkflowNode } from '../../core/domain/entities/project.entit
 import { useProject } from '../context/ProjectContext';
 import { IntroOutroModal, IntroOutroConfig } from './IntroOutroModal';
 
+const HIDDEN_PARAM_IDS = new Set([
+    'intro_mode',
+    'intro_template_id',
+    'intro_video',
+    'intro_text',
+    'intro_voice',
+    'intro_preview_aspect',
+    'intro_template_fields',
+    'outro_mode',
+    'outro_template_id',
+    'outro_video',
+    'outro_text',
+    'outro_voice',
+    'outro_preview_aspect',
+    'outro_template_fields'
+]);
+
 interface CreateJobModalProps {
     workflow: Workflow | null;
     isOpen: boolean;
@@ -54,22 +71,6 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ workflow, isOpen
     const nodes = workflow.nodes;
     const isLastStep = currentStep === nodes.length; // Final summary step
     const currentNode = nodes[currentStep];
-    const hiddenParamIds = React.useMemo(() => new Set([
-        'intro_mode',
-        'intro_template_id',
-        'intro_video',
-        'intro_text',
-        'intro_voice',
-        'intro_preview_aspect',
-        'intro_template_fields',
-        'outro_mode',
-        'outro_template_id',
-        'outro_video',
-        'outro_text',
-        'outro_voice',
-        'outro_preview_aspect',
-        'outro_template_fields'
-    ]), []);
 
     const buildIntroOutroConfig = (prefix: 'intro' | 'outro'): IntroOutroConfig => ({
         mode: (params[`${prefix}_mode`] || 'compose') as 'compose' | 'video',
@@ -187,7 +188,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ workflow, isOpen
 
                             <div className="space-y-5">
                                 {currentNode.parameters.map((param) => {
-                                    if (hiddenParamIds.has(param.id)) return null;
+                                    if (HIDDEN_PARAM_IDS.has(param.id)) return null;
                                     // Dynamic Filtering for Vocal Synthesis
                                     let options = param.options || [];
                                     if (currentNode.id === 'tpl-voice' && param.id === 'global_voice_style') {
@@ -346,7 +347,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ workflow, isOpen
                                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{node.label}</span>
                                         </div>
                                         <div className="grid grid-cols-2 gap-x-4 gap-y-2 pl-6">
-                                            {node.parameters.filter((p) => !hiddenParamIds.has(p.id)).map(p => (
+                                            {node.parameters.filter((p) => !HIDDEN_PARAM_IDS.has(p.id)).map(p => (
                                                 <div key={p.id} className="flex flex-col">
                                                     <span className="text-[9px] text-slate-400 font-bold">{p.label}</span>
                                                     <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">

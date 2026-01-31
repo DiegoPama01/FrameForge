@@ -50,6 +50,7 @@ services:
       dockerfile: Dockerfile
       args:
         - NEXT_PUBLIC_WORKER_API_URL=${NEXT_PUBLIC_WORKER_API_URL:-http://worker:8000}
+        - NEXT_PUBLIC_WORKER_API_URL_PUBLIC=${NEXT_PUBLIC_WORKER_API_URL_PUBLIC:-http://localhost:8000}
         - NEXT_PUBLIC_WORKER_TOKEN=${WORKER_TOKEN}
     ports:
       - "3000:3000"
