@@ -44,7 +44,7 @@ export interface Workflow {
 export interface WorkflowParameter {
     id: string;
     label: string;
-    type: 'string' | 'number' | 'select' | 'boolean' | 'chips' | 'multiselect';
+    type: 'string' | 'text' | 'number' | 'select' | 'boolean' | 'chips' | 'multiselect';
     placeholder?: string;
     defaultValue?: any;
     options?: { label: string; value: any }[];

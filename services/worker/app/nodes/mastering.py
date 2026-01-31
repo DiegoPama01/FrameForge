@@ -3,11 +3,13 @@ import math
 import os
 import random
 import re
+import json
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 
 from .base import BaseNode
 from ..services.meta_store import load_meta, update_meta
+from ..database import SessionLocal, AssetModel
 
 DATA_ROOT = Path(os.environ.get("DATA_ROOT", "/data")).resolve()
 ASSETS_ROOT = DATA_ROOT / "assets"
@@ -201,10 +203,23 @@ class MasteringNode(BaseNode):
         await self.log(output_path.parent.parent.name, f"Background candidates: {len(candidates)}", "info")
 
         segment_len = max(10.0, float(segment_minutes or 2) * 60.0)
+        await self.log(
+            output_path.parent.parent.name,
+            f"Background target duration={duration:.1f}s segment_len={segment_len:.1f}s",
+            "info"
+        )
         segments = await self._plan_segments(candidates, duration, segment_len, selection_strategy, transition_type)
         await self.log(
             output_path.parent.parent.name,
             "Segments: " + ", ".join([f"{s['path'].name}@{s['duration']:.1f}s" for s in segments]),
+            "info"
+        )
+        await self.log(
+            output_path.parent.parent.name,
+            "Segments detail: " + ", ".join([
+                f"{s['path'].name} start={s['start']:.1f}s dur={s['duration']:.1f}s loop={'yes' if s['loop'] else 'no'}"
+                for s in segments
+            ]),
             "info"
         )
 
@@ -213,12 +228,40 @@ class MasteringNode(BaseNode):
         return await self._build_segments_xfade(segments, target_w, target_h, output_path, transition_type)
 
     def _collect_candidates(self, asset_folder: str) -> List[Path]:
-        folder = ASSETS_ROOT / asset_folder
         candidates: List[Path] = []
-        if folder.exists():
-            candidates = [p for p in folder.rglob("*") if p.suffix.lower() in VIDEO_EXTS]
+
+        # First try to resolve by asset categories stored in DB
+        try:
+            db = SessionLocal()
+            assets = db.query(AssetModel).all()
+            for asset in assets:
+                try:
+                    cats = json.loads(asset.categories or "[]")
+                except Exception:
+                    cats = []
+                if asset_folder and asset_folder not in cats:
+                    continue
+                path = ASSETS_ROOT / asset.id
+                if path.exists() and path.suffix.lower() in VIDEO_EXTS:
+                    candidates.append(path)
+        except Exception:
+            candidates = []
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
+
+        # Fallback to physical folder scan
+        if not candidates and asset_folder:
+            folder = ASSETS_ROOT / asset_folder
+            if folder.exists():
+                candidates = [p for p in folder.rglob("*") if p.suffix.lower() in VIDEO_EXTS]
+
+        # Last resort: scan all assets
         if not candidates and ASSETS_ROOT.exists():
             candidates = [p for p in ASSETS_ROOT.rglob("*") if p.suffix.lower() in VIDEO_EXTS]
+
         return candidates
 
     async def _plan_segments(

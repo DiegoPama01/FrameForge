@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Job, Workflow, WorkflowParameter } from '../../core/domain/entities/project.entity';
 import { useProject } from '../context/ProjectContext';
+import { IntroOutroModal, IntroOutroConfig } from './IntroOutroModal';
 
 interface EditJobModalProps {
     job: Job | null;
@@ -11,10 +12,12 @@ interface EditJobModalProps {
 }
 
 export const EditJobModal: React.FC<EditJobModalProps> = ({ job, workflow, isOpen, onClose }) => {
-    const { updateJob, assetCategories } = useProject();
+    const { updateJob, assetCategories, assets, templates } = useProject();
     const [params, setParams] = useState<Record<string, any>>({});
     const [scheduleInterval, setScheduleInterval] = useState<'once' | 'daily' | 'weekly'>('once');
     const [scheduleTime, setScheduleTime] = useState('09:00');
+    const [isIntroOpen, setIsIntroOpen] = useState(false);
+    const [isOutroOpen, setIsOutroOpen] = useState(false);
 
     useEffect(() => {
         if (job && workflow) {
@@ -36,9 +39,8 @@ export const EditJobModal: React.FC<EditJobModalProps> = ({ job, workflow, isOpe
         }
     }, [job, workflow, isOpen]);
 
-    if (!isOpen || !job) return null;
-
     const handleSave = async () => {
+        if (!job) return;
         if (scheduleInterval !== 'once' && !scheduleTime) {
             alert('Please select a schedule time.');
             return;
@@ -55,6 +57,60 @@ export const EditJobModal: React.FC<EditJobModalProps> = ({ job, workflow, isOpe
     };
 
     const nodes = workflow?.nodes || [];
+    const hiddenParamIds = React.useMemo(() => new Set([
+        'intro_mode',
+        'intro_template_id',
+        'intro_video',
+        'intro_text',
+        'intro_voice',
+        'intro_preview_aspect',
+        'intro_template_fields',
+        'outro_mode',
+        'outro_template_id',
+        'outro_video',
+        'outro_text',
+        'outro_voice',
+        'outro_preview_aspect',
+        'outro_template_fields'
+    ]), []);
+    const videoAssets = React.useMemo(() => {
+        return assets.filter((asset) => {
+            const type = asset.type?.toLowerCase() || '';
+            return ['.mp4', '.mov', '.mkv', '.webm', '.avi'].includes(type);
+        });
+    }, [assets]);
+
+    const imageAssets = React.useMemo(() => {
+        return assets.filter((asset) => {
+            const type = asset.type?.toLowerCase() || '';
+            return ['.png', '.jpg', '.jpeg', '.webp'].includes(type);
+        });
+    }, [assets]);
+
+    const buildIntroOutroConfig = (prefix: 'intro' | 'outro'): IntroOutroConfig => ({
+        mode: (params[`${prefix}_mode`] || 'compose') as 'compose' | 'video',
+        video: params[`${prefix}_video`] || '',
+        text: params[`${prefix}_text`] || '',
+        voice: params[`${prefix}_voice`] || 'same',
+        templateId: params[`${prefix}_template_id`] || '',
+        templateFields: params[`${prefix}_template_fields`] || {},
+        previewAspect: params[`${prefix}_preview_aspect`] || '16:9'
+    });
+
+    const applyIntroOutroConfig = (prefix: 'intro' | 'outro', config: IntroOutroConfig) => {
+        setParams(prev => ({
+            ...prev,
+            [`${prefix}_mode`]: config.mode,
+            [`${prefix}_video`]: config.video,
+            [`${prefix}_text`]: config.text,
+            [`${prefix}_voice`]: config.voice,
+            [`${prefix}_template_id`]: config.templateId,
+            [`${prefix}_template_fields`]: config.templateFields,
+            [`${prefix}_preview_aspect`]: config.previewAspect || '16:9'
+        }));
+    };
+
+    if (!isOpen || !job) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -125,8 +181,8 @@ export const EditJobModal: React.FC<EditJobModalProps> = ({ job, workflow, isOpe
                             </div>
 
                             <div className="space-y-5">
-                                {node.parameters.map((param) => {
-                                    const input = renderParameterInput(param, node.id, params, assetCategories, handleParamChange);
+                                {node.parameters.filter((param) => !hiddenParamIds.has(param.id)).map((param) => {
+                                    const input = renderParameterInput(param, node.id, params, assetCategories, templates, videoAssets, imageAssets, handleParamChange);
                                     if (!input) return null;
                                     return (
                                         <div key={param.id} className={`space-y-1.5 ${param.id === 'global_voice_style' && params['global_gender'] === 'auto' ? 'hidden' : ''}`}>
@@ -135,6 +191,24 @@ export const EditJobModal: React.FC<EditJobModalProps> = ({ job, workflow, isOpe
                                         </div>
                                     );
                                 })}
+                                {node.label === 'Mastering' && (
+                                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsIntroOpen(true)}
+                                            className="btn-outline"
+                                        >
+                                            Configure Intro
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsOutroOpen(true)}
+                                            className="btn-outline"
+                                        >
+                                            Configure Outro
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -156,6 +230,34 @@ export const EditJobModal: React.FC<EditJobModalProps> = ({ job, workflow, isOpe
                     </button>
                 </div>
             </div>
+            {isIntroOpen && (
+                <IntroOutroModal
+                    title="Intro Builder"
+                    config={buildIntroOutroConfig('intro')}
+                    onClose={() => setIsIntroOpen(false)}
+                    onSave={(next) => {
+                        applyIntroOutroConfig('intro', next);
+                        return true;
+                    }}
+                    videoAssets={videoAssets.map((asset) => ({ name: asset.name, path: asset.path }))}
+                    templates={templates}
+                    placeholderValues={{}}
+                />
+            )}
+            {isOutroOpen && (
+                <IntroOutroModal
+                    title="Outro Builder"
+                    config={buildIntroOutroConfig('outro')}
+                    onClose={() => setIsOutroOpen(false)}
+                    onSave={(next) => {
+                        applyIntroOutroConfig('outro', next);
+                        return true;
+                    }}
+                    videoAssets={videoAssets.map((asset) => ({ name: asset.name, path: asset.path }))}
+                    templates={templates}
+                    placeholderValues={{}}
+                />
+            )}
         </div>
     );
 };
@@ -165,6 +267,9 @@ function renderParameterInput(
     nodeId: string,
     params: Record<string, any>,
     assetCategories: string[],
+    templates: any[],
+    videoAssets: any[],
+    imageAssets: any[],
     onChange: (id: string, value: any) => void
 ) {
     let options = param.options || [];
@@ -179,6 +284,24 @@ function renderParameterInput(
         options = assetCategories.map(f => ({
             label: f.charAt(0).toUpperCase() + f.slice(1),
             value: f
+        }));
+    }
+    if (param.id === 'intro_template_id' || param.id === 'outro_template_id') {
+        options = templates.map((tpl) => ({
+            label: tpl.name,
+            value: tpl.id
+        }));
+    }
+    if (param.id === 'background_video' || param.id === 'intro_video' || param.id === 'outro_video') {
+        options = videoAssets.map((asset) => ({
+            label: asset.name,
+            value: asset.path
+        }));
+    }
+    if (param.id === 'thumbnail') {
+        options = imageAssets.map((asset) => ({
+            label: asset.name,
+            value: asset.path
         }));
     }
 
@@ -209,6 +332,7 @@ function renderParameterInput(
                 onChange={(e) => onChange(param.id, e.target.value)}
                 className="input-field-solid cursor-pointer"
             >
+                <option value="">Select option</option>
                 {options.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
