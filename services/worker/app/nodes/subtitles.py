@@ -1,18 +1,13 @@
+import asyncio
 import os
 from pathlib import Path
 from typing import Dict, Any
 from .base import BaseNode
 from ..services.meta_store import load_meta
 
-try:
-    from openai import OpenAI, AsyncOpenAI
-except ImportError:
-    OpenAI = None
-    AsyncOpenAI = None
-
 class SubtitlesNode(BaseNode):
     async def execute(self, project_path: Path, context: Dict[str, Any]) -> bool:
-        await self.log(project_path.name, "Generating subtitles using Whisper API...")
+        await self.log(project_path.name, "Generating subtitles using local Whisper...")
         audio_path = project_path / "audio" / "source" / "full_audio.mp3"
         dst_path = project_path / "subtitles.srt"
         
@@ -21,23 +16,37 @@ class SubtitlesNode(BaseNode):
             return False
             
         try:
-            api_key = os.environ.get("OPENAI_API_KEY")
-            if not api_key: 
-                await self.log(project_path.name, "Missing OPENAI_API_KEY", "error")
+            model_path = os.environ.get("WHISPER_MODEL_PATH", "/opt/whisper.cpp/models/ggml-small.bin")
+            if not Path(model_path).exists():
+                await self.log(project_path.name, f"Whisper model not found: {model_path}", "error")
                 return False
-            if not AsyncOpenAI:
-                 await self.log(project_path.name, "OpenAI library not installed", "error")
-                 return False
 
-            client = AsyncOpenAI(api_key=api_key)
-            
-            with open(audio_path, "rb") as audio_file:
-                response = await client.audio.transcriptions.create(
-                    model="whisper-1", 
-                    file=audio_file,
-                    response_format="srt",
-                    language="es"
-                )
+            output_base = project_path / "subtitles"
+            cmd = [
+                "whisper",
+                "-m", model_path,
+                "-l", "es",
+                "-osrt",
+                "-of", str(output_base),
+                str(audio_path)
+            ]
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            _, stderr = await process.communicate()
+            if process.returncode != 0:
+                err_msg = stderr.decode(errors="ignore")[-600:]
+                await self.log(project_path.name, f"Whisper failed: {err_msg}", "error")
+                return False
+
+            generated_srt = output_base.with_suffix(".srt")
+            if not generated_srt.exists():
+                await self.log(project_path.name, "Whisper failed: SRT not generated", "error")
+                return False
+
+            response = generated_srt.read_text(encoding="utf-8", errors="replace")
             
             caption_mode = "line"
             meta = load_meta(project_path.name, project_path)

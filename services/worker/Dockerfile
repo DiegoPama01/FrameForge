@@ -19,6 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Whisper binary + models + libraries
 COPY --from=whisper-build /opt/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper
 COPY --from=whisper-build /opt/whisper.cpp/build/*.so* /usr/local/lib/
+COPY --from=whisper-build /opt/whisper.cpp/build/src/*.so* /usr/local/lib/
+COPY --from=whisper-build /opt/whisper.cpp/build /opt/whisper.cpp/build
 RUN ldconfig
 COPY --from=whisper-build /opt/whisper.cpp/models /opt/whisper.cpp/models
 
@@ -29,6 +31,7 @@ RUN python3 -m venv /opt/venv \
 
 ENV PATH="/opt/venv/bin:$PATH"
 ENV DATA_ROOT=/data
+ENV LD_LIBRARY_PATH="/usr/local/lib:/opt/whisper.cpp/build:$LD_LIBRARY_PATH"
 
 WORKDIR /app
 COPY app /app/app
