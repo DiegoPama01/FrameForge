@@ -4,10 +4,9 @@ import { useProject } from '../../presentation/context/ProjectContext';
 import { ProjectToolbar } from '../../presentation/components/ProjectToolbar';
 import { ProjectList } from '../../presentation/components/ProjectList';
 import { ProjectDetail } from '../../presentation/components/ProjectDetail';
-import { LogsConsole } from '../../presentation/components/LogsConsole';
 
 export default function ProjectsPage() {
-    const { projects, selectedProject, setSelectedProject, view, globalSearch } = useProject();
+    const { projects, selectedProject, setSelectedProject, globalSearch } = useProject();
 
     // Filter states
     const [statusFilter, setStatusFilter] = useState('All');
@@ -75,18 +74,12 @@ export default function ProjectsPage() {
             />
 
             <div className="flex-1 flex overflow-hidden">
-                {view === 'logs' ? (
-                    <LogsConsole />
-                ) : (
-                    <>
-                        <ProjectList
-                            projects={filteredProjects}
-                            selectedId={selectedProject?.id}
-                            onSelect={(id) => setSelectedProject(projects.find(p => p.id === id))}
-                        />
-                        <ProjectDetail project={selectedProject} />
-                    </>
-                )}
+                <ProjectList
+                    projects={filteredProjects}
+                    selectedId={selectedProject?.id}
+                    onSelect={(id) => setSelectedProject(projects.find(p => p.id === id))}
+                />
+                <ProjectDetail project={selectedProject} />
             </div>
         </div>
     );

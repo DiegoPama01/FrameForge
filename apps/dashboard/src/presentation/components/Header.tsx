@@ -1,7 +1,6 @@
 "use client";
-import React, { useState } from 'react';
-import { ApiClient } from '../../infrastructure/api/api.client';
-import { ProjectProvider, useProject } from '../context/ProjectContext';
+import React from 'react';
+import { useProject } from '../context/ProjectContext';
 
 export const Header: React.FC = () => {
     const { globalSearch, setGlobalSearch } = useProject();
@@ -25,14 +24,7 @@ export const Header: React.FC = () => {
                     />
                 </div>
             </div>
-            <div className="flex items-center gap-3">
-                <button className="size-9 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer">
-                    <span className="material-symbols-outlined text-[20px]">notifications</span>
-                </button>
-                <div className="size-9 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30">
-                    <span className="text-[10px] font-bold text-primary">ADMIN</span>
-                </div>
-            </div>
+            <div className="w-6"></div>
         </header>
     );
 };

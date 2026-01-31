@@ -32,17 +32,15 @@ export const WorkflowEditorView: React.FC = () => {
     }
 
     return (
-        <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-900/20 p-6">
-            <section className="mb-8 shrink-0">
-                <div className="flex items-center justify-between">
+        <section className="flex-1 overflow-auto bg-slate-50 dark:bg-background-dark p-8">
+            <div className="w-full space-y-6">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div>
-                        <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">Workflow Library</h2>
-                        <p className="text-sm text-slate-500 font-medium">Select a predefined pipeline to launch a new job.</p>
+                        <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Workflows</h2>
+                        <p className="text-slate-500 dark:text-slate-400 mt-1">Select a predefined pipeline to launch a new job.</p>
                     </div>
                 </div>
-            </section>
 
-            <section className="flex-1 overflow-y-auto custom-scrollbar">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-12">
                     {filteredWorkflows.map((workflow) => (
                         <div
@@ -85,7 +83,7 @@ export const WorkflowEditorView: React.FC = () => {
                                         setSelectedWorkflow(workflow);
                                         setIsLaunchModalOpen(true);
                                     }}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-xs font-black shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all cursor-pointer"
+                                    className="btn-primary"
                                 >
                                     <span className="material-symbols-outlined text-lg">rocket_launch</span>
                                     Launch
@@ -94,7 +92,7 @@ export const WorkflowEditorView: React.FC = () => {
                         </div>
                     ))}
                 </div>
-            </section>
+            </div>
 
             <CreateJobModal
                 workflow={selectedWorkflow}
@@ -104,6 +102,6 @@ export const WorkflowEditorView: React.FC = () => {
                     setSelectedWorkflow(null);
                 }}
             />
-        </div>
+        </section>
     );
 };

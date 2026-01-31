@@ -57,27 +57,19 @@ const DEFAULT_STAGES = WORKFLOW_TEMPLATES[0].stages;
 
 export const JobsView: React.FC = () => {
     const { jobs, workflows, globalSearch, deleteJob, runJob } = useProject();
-    const [statusFilter, setStatusFilter] = useState('All');
     const [editingJob, setEditingJob] = useState<Job | null>(null);
     const [isEditOpen, setIsEditOpen] = useState(false);
 
     const normalizedSearch = globalSearch.trim().toLowerCase();
 
-    const statusOptions = useMemo(() => {
-        const statuses = new Set(jobs.map((job) => job.status));
-        return ['All', ...Array.from(statuses)];
-    }, [jobs]);
-
     const filteredJobs = useMemo(() => {
         return jobs.filter((job) => {
-            const matchesStatus = statusFilter === 'All' || job.status === statusFilter;
-            if (!matchesStatus) return false;
             if (!normalizedSearch) return true;
             const workflow = workflows.find(w => w.id === job.workflowId);
             const haystack = [job.id, workflow?.name || '', job.status].join(' ').toLowerCase();
             return haystack.includes(normalizedSearch);
         });
-    }, [jobs, statusFilter, normalizedSearch, workflows]);
+    }, [jobs, normalizedSearch, workflows]);
 
     const handleDelete = async (jobId: string) => {
         if (!confirm('Delete this job?')) return;
@@ -104,55 +96,29 @@ export const JobsView: React.FC = () => {
     }, [editingJob, workflows]);
 
     return (
-        <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-900/20 p-6">
-            <section className="mb-8 shrink-0">
-                <div className="flex items-center justify-between">
+        <section className="flex-1 overflow-auto bg-slate-50 dark:bg-background-dark p-8">
+            <div className="w-full space-y-6">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div>
-                        <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">Execution Queue</h2>
-                        <p className="text-sm text-slate-500 font-medium">Monitor active and historical workflow jobs.</p>
+                        <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Jobs</h2>
+                        <p className="text-slate-500 dark:text-slate-400 mt-1">Monitor active and historical workflow jobs.</p>
                     </div>
                 </div>
-            </section>
 
-            <section className="flex-1 overflow-y-auto custom-scrollbar space-y-8">
-                {/* Jobs Queue */}
-                <div className="bg-white dark:bg-background-dark rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-50/30 dark:bg-transparent">
-                        <div>
-                            <h3 className="text-sm font-black uppercase tracking-tight">Active Jobs Queue</h3>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Live monitoring</p>
+                <div className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {filteredJobs.length === 0 && (
+                        <div className="col-span-full py-20 text-center">
+                            <span className="material-symbols-outlined text-6xl text-slate-200 mb-4">work</span>
+                            <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">No jobs found</p>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Filter By Status</span>
-                            <select
-                                value={statusFilter}
-                                onChange={(event) => setStatusFilter(event.target.value)}
-                                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer focus:ring-2 focus:ring-primary/20 transition-all outline-none"
-                            >
-                                {statusOptions.map((status) => (
-                                    <option key={status} value={status}>
-                                        {status}
-                                    </option>
-                                ))}
-                            </select>
-                            <div className="h-8 w-px bg-slate-200 dark:border-slate-800"></div>
-                            <span className="text-sm font-black text-primary">{filteredJobs.length} <span className="text-slate-400 font-medium">Jobs found</span></span>
-                        </div>
-                    </div>
+                    )}
 
-                    <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {filteredJobs.length === 0 && (
-                            <div className="col-span-full py-20 text-center">
-                                <span className="material-symbols-outlined text-6xl text-slate-200 mb-4">work</span>
-                                <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">No active jobs matching filters</p>
-                            </div>
-                        )}
-
-                        {filteredJobs.map((job) => {
-                            const workflow = workflows.find(w => w.id === job.workflowId);
-                            const progress = job.progress;
-                            return (
-                                <div key={job.id} className="group relative flex flex-col bg-slate-50/50 dark:bg-slate-900/40 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 transition-all hover:shadow-2xl hover:shadow-primary/5 hover:border-primary/30 hover:-translate-y-1">
+                    {filteredJobs.map((job) => {
+                        const workflow = workflows.find(w => w.id === job.workflowId);
+                        const progress = job.progress;
+                        return (
+                            <div key={job.id} className="group relative flex flex-col bg-slate-50/50 dark:bg-slate-900/40 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 transition-all hover:shadow-2xl hover:shadow-primary/5 hover:border-primary/30 hover:-translate-y-1">
                                     <div className="flex items-start justify-between mb-6">
                                         <div className="flex flex-col gap-1.5">
                                             <div className="flex items-center gap-2">
@@ -257,19 +223,19 @@ export const JobsView: React.FC = () => {
                                             </button>
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                            </div>
+                        );
+                    })}
                 </div>
-            </section>
+                </div>
+            </div>
             <EditJobModal
                 job={editingJob}
                 workflow={editingWorkflow}
                 isOpen={isEditOpen}
                 onClose={closeEdit}
             />
-        </div>
+        </section>
     );
 };
 

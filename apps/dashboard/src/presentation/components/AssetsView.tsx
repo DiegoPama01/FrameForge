@@ -904,7 +904,7 @@ const TemplateBuilderModal: React.FC<{
                         <div className="space-y-4 max-h-[520px] overflow-auto custom-scrollbar pr-2">
                             {fields.map((field) => (
                                 <div key={field.id} className="rounded-xl border border-slate-200 dark:border-slate-800 p-3 space-y-2">
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex items-center justify-between gap-2">
                                         <input
                                             value={field.name}
                                             onChange={(e) => updateField(field.id, 'name', e.target.value)}
@@ -914,26 +914,26 @@ const TemplateBuilderModal: React.FC<{
                                             <span className="material-symbols-outlined text-[18px]">delete</span>
                                         </button>
                                     </div>
-                                    <select
-                                        value=""
-                                        onChange={(e) => {
-                                            const presetId = e.target.value;
-                                            if (presetId) {
-                                                applyPreset(field.id, presetId);
-                                            }
-                                        }}
-                                        className="bg-slate-100 dark:bg-slate-800 rounded-lg px-2 py-1 text-xs"
-                                    >
-                                        <option value="">Apply style preset</option>
-                                        {PRESET_STYLES.map((preset) => (
-                                            <option key={preset.id} value={preset.id}>{preset.label}</option>
-                                        ))}
-                                    </select>
                                     <div className="grid grid-cols-2 gap-2">
+                                        <select
+                                            value=""
+                                            onChange={(e) => {
+                                                const presetId = e.target.value;
+                                                if (presetId) {
+                                                    applyPreset(field.id, presetId);
+                                                }
+                                            }}
+                                            className="input-field"
+                                        >
+                                            <option value="">Apply style preset</option>
+                                            {PRESET_STYLES.map((preset) => (
+                                                <option key={preset.id} value={preset.id}>{preset.label}</option>
+                                            ))}
+                                        </select>
                                         <select
                                             value={field.font}
                                             onChange={(e) => updateField(field.id, 'font', e.target.value)}
-                                            className="bg-slate-100 dark:bg-slate-800 rounded-lg px-2 py-1 text-xs"
+                                            className="input-field"
                                         >
                                             {FONT_OPTIONS.map((font) => (
                                                 <option key={font} value={font}>{font}</option>
@@ -943,20 +943,14 @@ const TemplateBuilderModal: React.FC<{
                                             type="number"
                                             value={field.size}
                                             onChange={(e) => updateField(field.id, 'size', Number(e.target.value))}
-                                            className="bg-slate-100 dark:bg-slate-800 rounded-lg px-2 py-1 text-xs"
+                                            className="input-field"
                                             min={8}
                                             max={160}
-                                        />
-                                        <input
-                                            type="color"
-                                            value={field.color}
-                                            onChange={(e) => updateField(field.id, 'color', e.target.value)}
-                                            className="h-8 w-full rounded-lg border border-slate-200 dark:border-slate-800"
                                         />
                                         <select
                                             value={field.shadow}
                                             onChange={(e) => updateField(field.id, 'shadow', e.target.value)}
-                                            className="bg-slate-100 dark:bg-slate-800 rounded-lg px-2 py-1 text-xs"
+                                            className="input-field"
                                         >
                                             {SHADOW_OPTIONS.map((shadow) => (
                                                 <option key={shadow} value={shadow}>{shadow}</option>
@@ -965,59 +959,73 @@ const TemplateBuilderModal: React.FC<{
                                         <select
                                             value={field.align}
                                             onChange={(e) => updateField(field.id, 'align', e.target.value)}
-                                            className="bg-slate-100 dark:bg-slate-800 rounded-lg px-2 py-1 text-xs"
+                                            className="input-field"
                                         >
                                             {ALIGN_OPTIONS.map((align) => (
                                                 <option key={align} value={align}>{align}</option>
                                             ))}
                                         </select>
                                         <input
-                                            type="number"
-                                            value={field.strokeWidth ?? 0}
-                                            onChange={(e) => updateField(field.id, 'strokeWidth', Number(e.target.value))}
-                                            className="bg-slate-100 dark:bg-slate-800 rounded-lg px-2 py-1 text-xs"
-                                            min={0}
-                                            max={12}
-                                            placeholder="Stroke"
-                                        />
-                                        <input
                                             type="color"
-                                            value={field.strokeColor ?? '#000000'}
-                                            onChange={(e) => updateField(field.id, 'strokeColor', e.target.value)}
-                                            className="h-8 w-full rounded-lg border border-slate-200 dark:border-slate-800"
+                                            value={field.color}
+                                            onChange={(e) => updateField(field.id, 'color', e.target.value)}
+                                            className="h-10 w-full rounded-lg border border-slate-200 dark:border-slate-800"
                                         />
-                                        <label className="col-span-2 flex items-center gap-2 text-xs text-slate-500">
-                                            <input
-                                                type="checkbox"
-                                                checked={field.preview ?? true}
-                                                onChange={(e) => updateField(field.id, 'preview', e.target.checked)}
-                                                className="size-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                            />
-                                            Preview text
-                                        </label>
-                                        <label className="col-span-2 flex items-center gap-2 text-xs text-slate-500">
-                                            <input
-                                                type="checkbox"
-                                                checked={(field as any).autoFit ?? false}
-                                                onChange={(e) => updateField(field.id, 'autoFit' as any, e.target.checked)}
-                                                className="size-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                            />
-                                            Auto-fit text
-                                        </label>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500">
-                                        <div>X: {(field.x * 100).toFixed(1)}%</div>
-                                        <div>Y: {(field.y * 100).toFixed(1)}%</div>
-                                        <div>W: {(field.width * 100).toFixed(1)}%</div>
-                                        <div>H: {(field.height * 100).toFixed(1)}%</div>
-                                    </div>
+                                    <details className="group">
+                                        <summary className="text-xs font-bold text-slate-500 cursor-pointer select-none list-none flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-[16px] transition-transform group-open:rotate-90">chevron_right</span>
+                                            Advanced
+                                        </summary>
+                                        <div className="mt-3 grid grid-cols-2 gap-2">
+                                            <input
+                                                type="number"
+                                                value={field.strokeWidth ?? 0}
+                                                onChange={(e) => updateField(field.id, 'strokeWidth', Number(e.target.value))}
+                                                className="input-field"
+                                                min={0}
+                                                max={12}
+                                                placeholder="Stroke"
+                                            />
+                                            <input
+                                                type="color"
+                                                value={field.strokeColor ?? '#000000'}
+                                                onChange={(e) => updateField(field.id, 'strokeColor', e.target.value)}
+                                                className="h-10 w-full rounded-lg border border-slate-200 dark:border-slate-800"
+                                            />
+                                            <label className="col-span-2 flex items-center gap-2 text-xs text-slate-500">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={field.preview ?? true}
+                                                    onChange={(e) => updateField(field.id, 'preview', e.target.checked)}
+                                                    className="size-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                                />
+                                                Preview text
+                                            </label>
+                                            <label className="col-span-2 flex items-center gap-2 text-xs text-slate-500">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={(field as any).autoFit ?? false}
+                                                    onChange={(e) => updateField(field.id, 'autoFit' as any, e.target.checked)}
+                                                    className="size-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                                />
+                                                Auto-fit text
+                                            </label>
+                                            <div className="col-span-2 grid grid-cols-2 gap-2 text-[10px] text-slate-500">
+                                                <div>X: {(field.x * 100).toFixed(1)}%</div>
+                                                <div>Y: {(field.y * 100).toFixed(1)}%</div>
+                                                <div>W: {(field.width * 100).toFixed(1)}%</div>
+                                                <div>H: {(field.height * 100).toFixed(1)}%</div>
+                                            </div>
+                                        </div>
+                                    </details>
                                 </div>
                             ))}
                         </div>
                         <button
                             onClick={handleCreateTemplate}
                             disabled={!name.trim() || !imagePath || uploading}
-                            className="w-full mt-2 flex items-center justify-center rounded-lg h-11 bg-primary text-white text-sm font-bold tracking-tight hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full mt-2 btn-primary"
                         >
                             {editingId ? 'Save Changes' : 'Save Template'}
                         </button>

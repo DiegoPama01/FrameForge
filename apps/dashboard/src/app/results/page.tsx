@@ -106,7 +106,7 @@ export default function ResultsPage() {
 
     return (
         <section className="flex-1 overflow-auto bg-slate-50 dark:bg-background-dark p-8">
-            <div className="max-w-6xl mx-auto space-y-6">
+            <div className="w-full space-y-6">
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div>
                         <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Ready for Assembly</h2>

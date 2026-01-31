@@ -1,7 +1,5 @@
 "use client";
 import React, { useState } from 'react';
-import { useProject } from '../context/ProjectContext';
-import { ApiClient } from '../../infrastructure/api/api.client';
 
 interface ProjectToolbarProps {
     statusFilter: string;
@@ -20,62 +18,15 @@ export const ProjectToolbar: React.FC<ProjectToolbarProps> = ({
     onlyErrors, setOnlyErrors,
     categories, statuses
 }) => {
-    const { refresh, view, setView } = useProject();
-    const [triggering, setTriggering] = useState(false);
-    const [harvesting, setHarvesting] = useState(false);
 
     // Dropdown states
     const [isStatusOpen, setIsStatusOpen] = useState(false);
     const [isCategoryOpen, setIsCategoryOpen] = useState(false);
 
-    const handleTrigger = async () => {
-        setTriggering(true);
-        try {
-            await ApiClient.triggerN8n();
-            alert('Pipeline triggered successfully! Check n8n for progress.');
-        } catch (error) {
-            console.error('Failed to trigger n8n', error);
-            alert('Failed to trigger pipeline.');
-        } finally {
-            setTriggering(false);
-        }
-    };
-
-    const handleHarvest = async () => {
-        setHarvesting(true);
-        try {
-            const res = await ApiClient.harvestProjects();
-            alert(`Harvesting complete! Found ${res.harvested_count} new stories.`);
-            await refresh();
-        } catch (error) {
-            console.error('Failed to harvest', error);
-            alert('Failed to harvest stories.');
-        } finally {
-            setHarvesting(false);
-        }
-    };
 
     return (
         <section className="p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark/30 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
-                {/* View Switcher */}
-                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg mr-2">
-                    <button
-                        onClick={() => setView('projects')}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${view === 'projects' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                    >
-                        Dashboard
-                    </button>
-                    <button
-                        onClick={() => setView('logs')}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${view === 'logs' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                    >
-                        Logs
-                    </button>
-                </div>
-
-                <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 mx-1"></div>
-
                 {/* Status Filter */}
                 <div className="relative">
                     <div
@@ -147,24 +98,7 @@ export const ProjectToolbar: React.FC<ProjectToolbarProps> = ({
                 </label>
             </div>
 
-            <div className="flex items-center gap-2">
-                <button
-                    onClick={handleHarvest}
-                    disabled={harvesting}
-                    className="flex items-center gap-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-1.5 rounded-lg text-sm font-bold transition-all cursor-pointer disabled:opacity-50"
-                >
-                    <span className="material-symbols-outlined text-[18px]">rss_feed</span>
-                    <span>{harvesting ? 'Scraping...' : 'Scrape Stories'}</span>
-                </button>
-                <button
-                    onClick={handleTrigger}
-                    disabled={triggering}
-                    className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-1.5 rounded-lg text-sm font-bold transition-all shadow-lg shadow-primary/20 cursor-pointer disabled:opacity-50"
-                >
-                    <span className="material-symbols-outlined text-[18px]">sync</span>
-                    <span>{triggering ? 'Triggering...' : 'Refresh All'}</span>
-                </button>
-            </div>
+            <div className="w-4"></div>
         </section>
     );
 };

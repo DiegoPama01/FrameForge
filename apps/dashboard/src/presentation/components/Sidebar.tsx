@@ -7,12 +7,8 @@ export const Sidebar: React.FC = () => {
     const pathname = usePathname();
 
     const menuItems = [
-        { id: 'projects', label: 'Projects', icon: 'grid_view', href: '/projects' },
-        { id: 'results', label: 'Results', icon: 'movie', href: '/results' },
-        { id: 'jobs', label: 'Jobs', icon: 'work', href: '/jobs' },
-        { id: 'workflows', label: 'Workflows', icon: 'hub', href: '/workflows' },
+        { id: 'dashboard', label: 'Dashboard', icon: 'space_dashboard', href: '/dashboard' },
         { id: 'assets', label: 'Assets', icon: 'folder', href: '/assets' },
-        { id: 'settings', label: 'Settings', icon: 'settings', href: '/settings' },
     ];
 
     return (
@@ -58,17 +54,7 @@ export const Sidebar: React.FC = () => {
                     })}
                 </nav>
             </div>
-            <div className="flex flex-col gap-4 border-t border-slate-200 dark:border-slate-800 pt-4">
-                <div className="flex items-center gap-3 px-3">
-                    <div className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-                        <img alt="User profile avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDDXRHyU-UeC8u3UnrLtJC1R2_EYua_ZEfQaxIlR6Kbqb1MN3o43YXipoKPrI5ruRWY4-wMSEOiPSl9RsQPDZxs4L0Ssc5kvKAtRm8bIsxft3AM0LdsFy1JYzxpfaPJaZ1eYjnzyHgETkphSrbbBZx5rmQF3w1PYvVUKg0tCigqTerGuY6QkZ6nAO7Eq_ZhjUZ6pX9OlCYdAqrI49AF-Lh94gVK619K6ibWqYru5qhtbkeUSqcQkb9WGmVT1-0ZZp-2WlwCJh_fmNc" className="w-full h-full object-cover" />
-                    </div>
-                    <div className="flex flex-col overflow-hidden">
-                        <p className="text-xs font-black truncate text-slate-900 dark:text-slate-100">Admin Console</p>
-                        <p className="text-[10px] text-slate-500 truncate font-bold uppercase tracking-tighter">admin@videoapi.io</p>
-                    </div>
-                </div>
-            </div>
+            <div className="h-4"></div>
         </aside>
     );
 };
