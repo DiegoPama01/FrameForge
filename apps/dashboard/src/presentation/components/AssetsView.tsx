@@ -123,7 +123,7 @@ export const AssetsView: React.FC = () => {
                     {activeTab === 'templates' ? (
                         <button
                             onClick={() => { setEditingTemplate(null); setIsTemplateModalOpen(true); }}
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-black text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer"
+                            className="btn-outline"
                         >
                             <span className="material-symbols-outlined text-[20px]">auto_fix_high</span>
                             <span>New Template</span>
@@ -132,7 +132,7 @@ export const AssetsView: React.FC = () => {
                         <>
                             <button
                                 onClick={() => setIsFolderModalOpen(true)}
-                                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-black text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer"
+                                className="btn-outline"
                             >
                                 <span className="material-symbols-outlined text-[20px]">create_new_folder</span>
                                 <span>New Folder</span>
@@ -140,7 +140,7 @@ export const AssetsView: React.FC = () => {
                             <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1"></div>
                             <button
                                 onClick={() => setIsUploadModalOpen(true)}
-                                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-2 rounded-xl text-xs font-black transition-all shadow-lg shadow-primary/20 cursor-pointer"
+                                className="btn-primary"
                             >
                                 <span className="material-symbols-outlined text-[20px]">upload_file</span>
                                 <span>Upload Asset</span>

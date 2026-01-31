@@ -438,7 +438,7 @@ export default function ResultsPage() {
                                     <input
                                         value={thumbnail || ''}
                                         onChange={(event) => setThumbnail(event.target.value || null)}
-                                        className="w-full bg-slate-100 dark:bg-[#283039] border-none rounded-lg px-3 py-2 text-sm font-medium"
+                                        className="input-field-compact"
                                         placeholder="thumbnail.png"
                                     />
                                     <p className="text-[10px] text-slate-400">
@@ -455,7 +455,7 @@ export default function ResultsPage() {
                                                 if (!next) return;
                                                 setThumbnail(next);
                                             }}
-                                            className="w-full bg-slate-100 dark:bg-[#283039] border-none rounded-lg px-3 py-2 text-sm font-medium"
+                                            className="input-field-compact"
                                         >
                                             <option value="">Select image asset</option>
                                             {imageAssets.map((asset) => (

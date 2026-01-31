@@ -126,19 +126,19 @@ export const SettingsView: React.FC = () => {
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-slate-500">Posts per Subreddit</label>
-                                    <input name="REDDIT_LIMIT" value={config.REDDIT_LIMIT} onChange={handleChange} className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary/50" type="number" />
+                                    <input name="REDDIT_LIMIT" value={config.REDDIT_LIMIT} onChange={handleChange} className="input-field" type="number" />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-slate-500">Min Chars</label>
-                                    <input name="MIN_CHARS" value={config.MIN_CHARS} onChange={handleChange} className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary/50" type="number" />
+                                    <input name="MIN_CHARS" value={config.MIN_CHARS} onChange={handleChange} className="input-field" type="number" />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-slate-500">Max Chars</label>
-                                    <input name="MAX_CHARS" value={config.MAX_CHARS} onChange={handleChange} className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary/50" type="number" />
+                                    <input name="MAX_CHARS" value={config.MAX_CHARS} onChange={handleChange} className="input-field" type="number" />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-slate-500">Timeframe</label>
-                                    <select name="REDDIT_TIMEFRAME" value={config.REDDIT_TIMEFRAME} onChange={handleChange} className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary/50 cursor-pointer">
+                                    <select name="REDDIT_TIMEFRAME" value={config.REDDIT_TIMEFRAME} onChange={handleChange} className="input-field">
                                         <option value="hour">Hour</option>
                                         <option value="day">Day</option>
                                         <option value="week">Week</option>
@@ -160,11 +160,11 @@ export const SettingsView: React.FC = () => {
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-slate-500">OpenAI API Key</label>
-                                    <input name="OPENAI_API_KEY" value={config.OPENAI_API_KEY} onChange={handleChange} className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary/50" type="password" />
+                                    <input name="OPENAI_API_KEY" value={config.OPENAI_API_KEY} onChange={handleChange} className="input-field" type="password" />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-slate-500">n8n Webhook URL</label>
-                                    <input name="N8N_WEBHOOK_URL" value={config.N8N_WEBHOOK_URL} onChange={handleChange} className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary/50" placeholder="http://localhost:5678/webhook/..." type="text" />
+                                    <input name="N8N_WEBHOOK_URL" value={config.N8N_WEBHOOK_URL} onChange={handleChange} className="input-field" placeholder="http://localhost:5678/webhook/..." type="text" />
                                 </div>
                             </div>
                         </div>
@@ -182,11 +182,11 @@ export const SettingsView: React.FC = () => {
                         <div id="legacy-section" className="p-6 hidden grid grid-cols-2 gap-6 bg-white dark:bg-background-dark/50">
                             <div className="space-y-2">
                                 <label className="text-xs font-bold text-slate-400">Reddit Client ID</label>
-                                <input name="REDDIT_CLIENT_ID" value={config.REDDIT_CLIENT_ID} onChange={handleChange} className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-lg px-4 py-2 text-sm text-slate-400" type="text" />
+                                <input name="REDDIT_CLIENT_ID" value={config.REDDIT_CLIENT_ID} onChange={handleChange} className="input-field-muted" type="text" />
                             </div>
                             <div className="space-y-2">
                                 <label className="text-xs font-bold text-slate-400">Reddit Secret</label>
-                                <input name="REDDIT_CLIENT_SECRET" value={config.REDDIT_CLIENT_SECRET} onChange={handleChange} className="w-full bg-slate-50 dark:bg-slate-900 border-none rounded-lg px-4 py-2 text-sm text-slate-400" type="password" />
+                                <input name="REDDIT_CLIENT_SECRET" value={config.REDDIT_CLIENT_SECRET} onChange={handleChange} className="input-field-muted" type="password" />
                             </div>
                         </div>
                     </div>
@@ -201,7 +201,7 @@ export const SettingsView: React.FC = () => {
                         <button
                             type="submit"
                             disabled={saving}
-                            className="bg-primary hover:bg-primary/90 text-white px-8 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-primary/20 transition-all cursor-pointer disabled:opacity-50"
+                            className="btn-primary-lg"
                         >
                             {saving ? 'Saving...' : 'Save Settings'}
                         </button>

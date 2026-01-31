@@ -203,7 +203,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ workflow, isOpen
                                                     <select
                                                         value={params[param.id]}
                                                         onChange={(e) => handleParamChange(param.id, e.target.value)}
-                                                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none cursor-pointer"
+                                                        className="input-field-solid cursor-pointer"
                                                     >
                                                         {options.map(opt => (
                                                             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -226,7 +226,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ workflow, isOpen
                                                     placeholder={param.placeholder}
                                                     value={params[param.id]}
                                                     onChange={(e) => handleParamChange(param.id, param.type === 'number' ? parseFloat(e.target.value) : e.target.value)}
-                                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                                                    className="input-field-solid"
                                                 />
                                             )}
                                         </div>
@@ -280,7 +280,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ workflow, isOpen
                                         <select
                                             value={scheduleInterval}
                                             onChange={(e) => setScheduleInterval(e.target.value as 'once' | 'daily' | 'weekly')}
-                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none cursor-pointer"
+                                            className="input-field-solid cursor-pointer"
                                         >
                                             <option value="once">Once (immediately)</option>
                                             <option value="daily">Daily</option>
@@ -293,7 +293,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ workflow, isOpen
                                             type="time"
                                             value={scheduleTime}
                                             onChange={(e) => setScheduleTime(e.target.value)}
-                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                                            className="input-field-solid"
                                         />
                                     </div>
                                 </div>
@@ -332,7 +332,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ workflow, isOpen
                     {!isLastStep ? (
                         <button
                             onClick={handleNext}
-                            className="bg-primary hover:bg-primary/90 text-white px-8 py-2.5 rounded-2xl text-sm font-black shadow-lg shadow-primary/20 transition-all flex items-center gap-2"
+                            className="btn-primary-lg"
                         >
                             Next Step
                             <span className="material-symbols-outlined text-lg">arrow_forward</span>

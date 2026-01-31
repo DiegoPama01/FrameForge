@@ -23,6 +23,36 @@
   body {
     @apply bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased;
   }
+  button {
+    @apply cursor-pointer;
+  }
+  button:disabled {
+    @apply cursor-not-allowed;
+  }
+}
+
+@layer components {
+  .input-field {
+    @apply w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary/50;
+  }
+  .input-field-muted {
+    @apply w-full bg-slate-50 dark:bg-slate-900 border-none rounded-lg px-4 py-2 text-sm text-slate-400;
+  }
+  .input-field-compact {
+    @apply w-full bg-slate-100 dark:bg-[#283039] border-none rounded-lg px-3 py-2 text-sm font-medium;
+  }
+  .input-field-solid {
+    @apply w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none;
+  }
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-black text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-2 rounded-xl text-xs font-black transition-all shadow-lg shadow-primary/20;
+  }
+  .btn-primary-lg {
+    @apply inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white px-8 py-2.5 rounded-2xl text-sm font-black shadow-lg shadow-primary/20 transition-all;
+  }
 }
 
 @layer utilities {

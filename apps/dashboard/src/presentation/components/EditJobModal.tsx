@@ -88,7 +88,7 @@ export const EditJobModal: React.FC<EditJobModalProps> = ({ job, workflow, isOpe
                                 <select
                                     value={scheduleInterval}
                                     onChange={(e) => setScheduleInterval(e.target.value as 'once' | 'daily' | 'weekly')}
-                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none cursor-pointer"
+                                    className="input-field-solid cursor-pointer"
                                 >
                                     <option value="once">Once (manual)</option>
                                     <option value="daily">Daily</option>
@@ -101,7 +101,7 @@ export const EditJobModal: React.FC<EditJobModalProps> = ({ job, workflow, isOpe
                                     type="time"
                                     value={scheduleTime}
                                     onChange={(e) => setScheduleTime(e.target.value)}
-                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                                    className="input-field-solid"
                                 />
                             </div>
                         </div>
@@ -149,7 +149,7 @@ export const EditJobModal: React.FC<EditJobModalProps> = ({ job, workflow, isOpe
                     </button>
                     <button
                         onClick={handleSave}
-                        className="bg-primary hover:bg-primary/90 text-white px-8 py-2.5 rounded-2xl text-sm font-black shadow-lg shadow-primary/20 transition-all flex items-center gap-2"
+                        className="btn-primary-lg"
                     >
                         <span className="material-symbols-outlined text-lg">save</span>
                         Save Changes
@@ -207,7 +207,7 @@ function renderParameterInput(
             <select
                 value={params[param.id]}
                 onChange={(e) => onChange(param.id, e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none cursor-pointer"
+                className="input-field-solid cursor-pointer"
             >
                 {options.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -236,7 +236,7 @@ function renderParameterInput(
             placeholder={param.placeholder}
             value={params[param.id]}
             onChange={(e) => onChange(param.id, param.type === 'number' ? parseFloat(e.target.value) : e.target.value)}
-            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+            className="input-field-solid"
         />
     );
 }
